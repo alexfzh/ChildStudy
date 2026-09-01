@@ -196,7 +196,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from "vue";
+import { ref, computed, onMounted, onUnmounted } from "vue";
 import { useRouter } from "vue-router";
 import { ElMessage } from "element-plus";
 import { useChildStore } from "@/stores/child";
@@ -242,6 +242,7 @@ async function loadKpMasteryForUnits(units) {
 
 const router = useRouter();
 const childStore = useChildStore();
+let reloadTimer = null;
 
 const loading = ref(false);
 const versions = ref([]);
@@ -380,7 +381,11 @@ function goProject(u) {
 
 onMounted(async () => {
   await loadVersions();
-  setTimeout(() => reload(), 200);
+  reloadTimer = setTimeout(() => reload(), 200);
+});
+
+onUnmounted(() => {
+  if (reloadTimer) clearTimeout(reloadTimer);
 });
 </script>
 

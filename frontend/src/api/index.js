@@ -46,6 +46,7 @@ export const authAPI = {
     api.get("/auth/me", { headers: token ? { Authorization: `Bearer ${token}` } : {} }).then((r) => r.data),
   listUsers: () => api.get("/auth/users").then((r) => r.data),
   createUser: (data) => api.post("/auth/users", data).then((r) => r.data),
+  changePassword: (data) => api.post("/auth/change-password", data).then((r) => r.data),
 };
 
 export const childrenAPI = {

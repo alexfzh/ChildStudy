@@ -31,47 +31,54 @@ const navGroups = [
   {
     label: "概览",
     items: [
-      { name: "dashboard", path: "/dashboard", label: "家长看板", icon: "📊" },
-      { name: "children", path: "/children", label: "孩子档案", icon: "👶" },
+      { name: "dashboard", path: "/dashboard", label: "家长看板", icon: "📊", roles: ["parent"] },
+      { name: "child-dashboard", path: "/child", label: "我的看板", icon: "🌟", roles: ["child"] },
+      { name: "children", path: "/children", label: "孩子档案", icon: "👶", roles: ["parent"] },
     ],
   },
   {
     label: "学业",
     items: [
-      { name: "exams", path: "/exams", label: "考试管理", icon: "📝" },
-      { name: "homeworks", path: "/homeworks", label: "作业追踪", icon: "📚" },
-      { name: "knowledge-points", path: "/knowledge-points", label: "知识点标签库", icon: "🏷️" },
-      { name: "wrong-questions", path: "/wrong-questions", label: "错题本", icon: "📙" },
-      { name: "question-banks", path: "/question-banks", label: "题库练习", icon: "✏️" },
-      { name: "study-progress", path: "/study-progress", label: "教材学习进度", icon: "📚" },
-      { name: "ai-reports", path: "/ai-reports", label: "AI 报告管理", icon: "🤖" },
+      { name: "exams", path: "/exams", label: "考试管理", icon: "📝", roles: ["parent"] },
+      { name: "homeworks", path: "/homeworks", label: "作业追踪", icon: "📚", roles: ["parent"] },
+      { name: "knowledge-points", path: "/knowledge-points", label: "知识点标签库", icon: "🏷️", roles: ["parent"] },
+      { name: "wrong-questions", path: "/wrong-questions", label: "错题本", icon: "📙", roles: ["parent", "child"] },
+      { name: "question-banks", path: "/question-banks", label: "题库练习", icon: "✏️", roles: ["parent", "child"] },
+      { name: "study-progress", path: "/study-progress", label: "教材学习进度", icon: "📚", roles: ["parent", "child"] },
+      { name: "ai-reports", path: "/ai-reports", label: "AI 报告管理", icon: "🤖", roles: ["parent"] },
     ],
   },
   {
     label: "激励",
     items: [
-      { name: "rewards", path: "/rewards", label: "奖励商城", icon: "🎁" },
-      { name: "achievements", path: "/achievements", label: "成就墙", icon: "🏆" },
+      { name: "rewards", path: "/rewards", label: "奖励商城", icon: "🎁", roles: ["parent", "child"] },
+      { name: "achievements", path: "/achievements", label: "成就墙", icon: "🏆", roles: ["parent", "child"] },
     ],
   },
   {
     label: "成长",
     items: [
-      { name: "timeline", path: "/timeline", label: "成长时间轴", icon: "🌱" },
-      { name: "project-works", path: "/project-works", label: "Big Task 作品", icon: "🎨" },
-      { name: "growth", path: "/growth", label: "生长发育", icon: "📏" },
-      { name: "social-emotional", path: "/social-emotional", label: "社交情感", icon: "💭" },
-      { name: "interests", path: "/interests", label: "兴趣特长", icon: "🎨" },
+      { name: "timeline", path: "/timeline", label: "成长时间轴", icon: "🌱", roles: ["parent"] },
+      { name: "project-works", path: "/project-works", label: "Big Task 作品", icon: "🎨", roles: ["parent", "child"] },
+      { name: "growth", path: "/growth", label: "生长发育", icon: "📏", roles: ["parent"] },
+      { name: "social-emotional", path: "/social-emotional", label: "社交情感", icon: "💭", roles: ["parent"] },
+      { name: "interests", path: "/interests", label: "兴趣特长", icon: "🎨", roles: ["parent"] },
     ],
   },
   {
     label: "系统",
     items: [
-      { name: "settings", path: "/settings", label: "系统设置", icon: "⚙️" },
-      { name: "about", path: "/about", label: "关于系统", icon: "ℹ️" },
+      { name: "settings", path: "/settings", label: "系统设置", icon: "⚙️", roles: ["parent"] },
+      { name: "about", path: "/about", label: "关于系统", icon: "ℹ️", roles: ["parent", "child"] },
     ],
   },
 ];
+
+// 按角色过滤菜单项：孩子只看白名单，家长看全部
+const canSee = (item) => {
+  const roles = item.roles || ["parent", "child"];
+  return auth.isChild ? roles.includes("child") : roles.includes("parent");
+};
 
 // 分组菜单（概览/学业/激励/成长/系统）
 const groupExpanded = ref(navGroups.map(() => true));
@@ -129,6 +136,7 @@ const closeSidebar = () => {
         <template v-for="(group, gIdx) in navGroups" :key="group.label">
           <!-- 分组标题（可点击折叠） -->
           <button
+            v-if="group.items.filter(canSee).length"
             type="button"
             class="flex items-center justify-between w-full px-3 py-2 text-sm font-semibold text-slate-500 hover:text-slate-700 hover:bg-slate-50 rounded-lg transition-colors cursor-pointer"
             @click="toggleGroup(gIdx)"
@@ -145,7 +153,7 @@ const closeSidebar = () => {
             :style="{ maxHeight: groupExpanded[gIdx] ? '600px' : '0px', opacity: groupExpanded[gIdx] ? 1 : 0 }"
           >
             <router-link
-              v-for="item in group.items"
+              v-for="item in group.items.filter(canSee)"
               :key="item.name"
               :to="item.path"
               class="flex items-center gap-3 px-3 py-2 mb-0.5 rounded-lg text-sm font-medium transition-colors"

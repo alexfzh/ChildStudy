@@ -86,6 +86,14 @@ export const useChildStore = defineStore("child", {
       this.currentId = id;
       localStorage.setItem("currentChildId", String(id));
     },
+    // 孩子账号后端禁止访问 /api/children（仅家长可列），无法用 loadChildren。
+    // 直接用登录返回的 child_id + display_name 自举一个最小 child 对象，
+    // 使各页面通过 childStore.currentId 取数，无需“选择孩子”。
+    bootstrapChild(child) {
+      this.children = [{ id: child.id, name: child.name }];
+      this.currentId = child.id;
+      localStorage.setItem("currentChildId", String(child.id));
+    },
     async create(data) {
       const child = await childrenAPI.create(data);
       this.children.push(child);

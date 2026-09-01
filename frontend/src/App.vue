@@ -13,12 +13,21 @@ const useLayout = computed(() => auth.isAuthenticated && !route.meta.public);
 
 onMounted(async () => {
   await childStore.loadConfig();
-  // 只在已认证后才拉孩子列表（认证页面 / setup 不需要）
+  // 只在已认证后才初始化孩子上下文（认证页面 / setup 不需要）
   if (auth.isAuthenticated) {
-    try {
-      await childStore.loadChildren();
-    } catch (e) {
-      console.warn("加载孩子列表失败：", e);
+    if (auth.isChild) {
+      // 孩子账号后端禁止 /api/children，用已从 localStorage 恢复的用户信息自举，
+      // 覆盖刷新页面后 childStore 仍为空的场景
+      childStore.bootstrapChild({
+        id: auth.currentChildId,
+        name: auth.user?.display_name,
+      });
+    } else {
+      try {
+        await childStore.loadChildren();
+      } catch (e) {
+        console.warn("加载孩子列表失败：", e);
+      }
     }
   }
 });

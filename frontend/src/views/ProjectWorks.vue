@@ -149,7 +149,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted, reactive } from "vue";
+import { ref, onMounted, onUnmounted, reactive } from "vue";
 import { useRoute } from "vue-router";
 import { ElMessage, ElMessageBox } from "element-plus";
 import { useChildStore } from "@/stores/child";
@@ -157,6 +157,7 @@ import { textbookAPI, projectWorksAPI } from "@/api";
 
 const route = useRoute();
 const childStore = useChildStore();
+let reloadTimer = null;
 
 const loading = ref(false);
 const works = ref([]);
@@ -307,7 +308,11 @@ onMounted(async () => {
   await loadUnits();
   const presetUnitId = Number(route.query.unit_id);
   if (presetUnitId) filterUnitId.value = presetUnitId;
-  setTimeout(() => reload(), 200);
+  reloadTimer = setTimeout(() => reload(), 200);
+});
+
+onUnmounted(() => {
+  if (reloadTimer) clearTimeout(reloadTimer);
 });
 </script>
 

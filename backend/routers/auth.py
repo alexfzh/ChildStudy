@@ -44,6 +44,11 @@ class LoginRequest(BaseModel):
     password: str
 
 
+class ChangePasswordRequest(BaseModel):
+    old_password: str = Field(min_length=6, max_length=128)
+    new_password: str = Field(min_length=6, max_length=128)
+
+
 class TokenResponse(BaseModel):
     access_token: str
     token_type: str = "bearer"
@@ -166,6 +171,21 @@ async def login(req: LoginRequest, db: AsyncSession = Depends(get_db)):
         expires_in=settings.jwt_expire_seconds,
         user=UserOut.model_validate(user),
     )
+
+
+@router.post("/change-password")
+async def change_password(
+    req: ChangePasswordRequest,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """已登录用户修改自己的密码：校验原密码后更新哈希。"""
+    if not verify_password(req.old_password, user.password_hash):
+        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "原密码错误")
+    user.password_hash = hash_password(req.new_password)
+    await db.commit()
+    await db.refresh(user)
+    return {"ok": True, "msg": "密码修改成功"}
 
 
 @router.post("/logout")

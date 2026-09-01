@@ -121,7 +121,7 @@ const typeColors = {
     </div>
 
     <div v-else class="space-y-4">
-      <div v-for="(items, type) in grouped()" :key="type" class="card p-5">
+      <div v-for="(items, type) in grouped" :key="type" class="card p-5">
         <div class="flex items-center gap-2 mb-3">
           <span class="px-2.5 py-1 rounded-lg text-xs font-medium border" :class="typeColors[type] || typeColors['其他']">{{ type }}</span>
           <span class="text-xs text-slate-400">{{ items.length }} 条记录</span>

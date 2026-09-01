@@ -23,14 +23,14 @@ const routes = [
   { path: "/interests", name: "interests", component: () => import("@/views/Interests.vue"), meta: { title: "兴趣特长", role: "parent" } },
   { path: "/rewards", name: "rewards", component: () => import("@/views/Rewards.vue"), meta: { title: "奖励商城" } },
   { path: "/achievements", name: "achievements", component: () => import("@/views/Achievements.vue"), meta: { title: "成就墙" } },
-  { path: "/question-banks", name: "question-banks", component: () => import("@/views/QuestionBank.vue"), meta: { title: "题库管理", role: "parent" } },
+  { path: "/question-banks", name: "question-banks", component: () => import("@/views/QuestionBank.vue"), meta: { title: "题库练习" } },
   { path: "/exercise", name: "exercise", component: () => import("@/views/Exercise.vue"), meta: { title: "开始练习" } },
   { path: "/study-progress", name: "study-progress", component: () => import("@/views/StudyProgress.vue"), meta: { title: "教材学习进度" } },
   { path: "/project-works", name: "project-works", component: () => import("@/views/ProjectWorks.vue"), meta: { title: "单元 Big Task" } },
   { path: "/about", name: "about", component: () => import("@/views/About.vue"), meta: { title: "关于系统"} },
 
-  // ==== 孩子路由（Phase C 第二轮再做，先占位） ====
-  { path: "/child", component: () => import("@/views/Dashboard.vue"), meta: { title: "我的看板", role: "child" } },
+  // ==== 孩子路由 ====
+  { path: "/child", component: () => import("@/views/ChildDashboard.vue"), meta: { title: "我的看板", role: "child" } },
 
   // ==== 404 ====
   { path: "/:pathMatch(.*)*", redirect: "/" },
@@ -57,6 +57,16 @@ router.beforeEach(async (to) => {
       console.warn("setup-status check failed:", e);
     }
     return { path: "/login", query: { redirect: to.fullPath } };
+  }
+
+  // 2.5) 已登录但本次会话尚未校验过 token 有效性（覆盖密钥轮换 / token 过期场景）：
+  // 先用 /auth/me 校验，失效则 refreshMe 内部会清 token 并登出，这里直接干净跳登录，
+  // 避免带失效 token 把受保护页面渲染出来、再在 mounted 里刷出一堆 401。
+  if (!auth.tokenValidated) {
+    await auth.refreshMe();
+    if (!auth.isAuthenticated) {
+      return { path: "/login", query: { redirect: to.fullPath } };
+    }
   }
 
   // 3) 已登录但角色不匹配：跳到对应首页

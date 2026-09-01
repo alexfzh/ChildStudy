@@ -7,6 +7,8 @@ export const useAuthStore = defineStore("auth", {
     user: JSON.parse(localStorage.getItem("user") || "null"),
     accessibleChildIds: JSON.parse(localStorage.getItem("accessible_child_ids") || "[]"),
     needsSetup: false,
+    // 本次会话内是否已校验过 token 有效性（用于路由守卫首次导航校验，不持久化）
+    tokenValidated: false,
   }),
   getters: {
     isAuthenticated: (s) => !!s.token,
@@ -43,6 +45,8 @@ export const useAuthStore = defineStore("auth", {
         const me = await authAPI.me(this.token);
         this.accessibleChildIds = me.accessible_child_ids;
         localStorage.setItem("accessible_child_ids", JSON.stringify(me.accessible_child_ids));
+        // 校验成功：本次会话内不再重复校验
+        this.tokenValidated = true;
       } catch (e) {
         if (e.response?.status === 401) this.logout();
       }

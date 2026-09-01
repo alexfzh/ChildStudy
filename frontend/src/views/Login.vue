@@ -49,6 +49,10 @@ async function submit() {
         // 容错：即使拉失败也不阻塞登录
         console.warn("加载孩子列表失败：", e);
       }
+    } else if (user.role === "child") {
+      // 孩子账号后端禁止访问 /api/children，用登录信息自举 childStore，
+      // 否则各页面读到的 childStore.currentId 为 null，会提示“先选择孩子”
+      childStore.bootstrapChild({ id: user.child_id, name: user.display_name });
     }
     // 跳转到登录前想去的页面或首页
     const next = route.query.redirect || (user.role === "child" ? "/child" : "/");
