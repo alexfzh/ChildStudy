@@ -1,0 +1,15 @@
+{
+  "name": "学业成长系统",
+  "short_name": "学业追踪",
+  "description": "记录考试、作业、知识点，辅助家长了解学情。",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#f8fafc",
+  "theme_color": "#4f46e5",
+  "icons": [
+    { "src": "/favicon-32x32.png", "sizes": "32x32", "type": "image/png" },
+    { "src": "/favicon-16x16.png", "sizes": "16x16", "type": "image/png" }
+  ]
+}
+

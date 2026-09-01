@@ -1,0 +1,15 @@
+# ruff 配置：面向本项目的保守规则集
+# - E/F/W/I/B/RUF 基础质量规则；UP（typing 现代化）暂不启用，避免全库大面积改动
+# - B008 忽略：db: AsyncSession = Depends(get_db) 是 FastAPI 标准写法
+# - RUF001/002/003 忽略：中文全角标点（，。""）的误报
+# - E501 忽略：中文注释/中文字符宽度导致的行长误报
+line-length = 120
+
+extend-exclude = ["seeds"]  # 一次性造数脚本，不参与 lint 门禁
+
+[lint]
+select = ["E", "F", "W", "I", "B", "RUF"]
+ignore = ["B008", "RUF001", "RUF002", "RUF003", "E501"]
+
+[lint.isort]
+known-first-party = ["models", "schemas", "database", "routers", "utils"]

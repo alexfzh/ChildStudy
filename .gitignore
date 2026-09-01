@@ -1,0 +1,40 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+.env
+*.db
+*.db-journal
+
+# Node
+node_modules/
+dist/
+.cache/
+.parcel-cache/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+.DS_Store
+
+# 上传文件
+uploads/*
+!uploads/.gitkeep
+
+# 数据
+data/*
+!data/.gitkeep
+*.db.bak*
+*.db.backup
+*.sqlite.bak
+
+# 运行日志
+*.log
+
+# 内部工作目录（不纳入版本控制）
+.workbuddy/
+.learnings/
+.cleanup-archives/

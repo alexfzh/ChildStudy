@@ -1,0 +1,6 @@
+# 测试与开发依赖（安装：pip install -r requirements-dev.txt）
+# 全部 pin 精确版本，与 venv 实际一致（hygiene: 新机器/CI 装出来跟开发机完全一致）
+pytest==9.1.1
+pytest-asyncio==1.4.0
+httpx==0.28.1
+ruff==0.16.5  # 静态检查：未用导入 / 裸 except / 不可达代码等（CQ-9 防回流）
