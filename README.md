@@ -418,6 +418,14 @@ A: 直接复制 `backend/data/childstudy.db` 文件即可。建议定期备份�
 **Q: 升级系统？**
 A: 保留 `backend/data/` 目录（数据库），然后 `git pull` + 重启服务。
 
+## 👥 贡献者
+
+| 贡献者 | 角色 |
+|--------|------|
+| alexfzh | 项目维护者 · 产品与数据设计 |
+| workbuddy | AI 开发助手 · 功能开发 / 复核 / 文档同步 |
+| openclaw | AI 开发助手 · 代码实现与运维支持 |
+
 ## 📄 License
 
 MIT
