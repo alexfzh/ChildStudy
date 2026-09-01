@@ -121,7 +121,8 @@ ChildStudy/
 │   ├── schemas.py                # Pydantic 请求/响应模式
 │   ├── requirements.txt          # Python 依赖
 │   ├── .env.example              # 环境变量模板
-│   ├── routers/                  # API 路由（20 个 router）
+│   ├── routers/                  # API 路由（23 个 router）
+│   │   ├── auth.py               #   多用户认证（setup/登录/JWT/子账号）
 │   │   ├── children.py           #   孩子档案 CRUD + 年级历史
 │   │   ├── exams.py              #   考试记录
 │   │   ├── homework.py           #   作业追踪
@@ -155,21 +156,27 @@ ChildStudy/
 │   │   ├── main.js               # 入口（Vue + Element Plus + Pinia + Router）
 │   │   ├── App.vue               # 根组件
 │   │   ├── api/index.js          # axios 封装（所有后端 API）
-│   │   ├── stores/child.js       # Pinia：孩子状态 + 切换
-│   │   ├── router/index.js       # 19 个路由
+│   │   ├── stores/
+│   │   │   ├── auth.js           # Pinia：登录态 + JWT + 角色
+│   │   │   └── child.js          # Pinia：孩子状态 + 切换
+│   │   ├── router/index.js       # 22 个路由
 │   │   ├── components/
 │   │   │   ├── Layout.vue        # 侧边栏布局（5 分组 + 系统）
 │   │   │   ├── ChildSelector.vue # 孩子切换下拉框
 │   │   │   ├── SubjectPicker.vue # 科目选择器
+│   │   │   ├── AchIcon.vue       # 成就图标组件
 │   │   │   └── charts/           # ECharts 封装
 │   │   │       ├── BaseChart.vue
 │   │   │       ├── RadarChart.vue
 │   │   │       ├── SubjectBarChart.vue
 │   │   │       └── TrendLineChart.vue
-│   │   ├── views/                # 19 个页面
+│   │   ├── views/                # 22 个页面
+│   │   │   ├── Login.vue         #   登录
+│   │   │   ├── Setup.vue         #   首次启动
 │   │   │   ├── Dashboard.vue     #   家长看板
 │   │   │   ├── Children.vue      #   孩子档案
 │   │   │   ├── Exams.vue         #   考试管理
+│   │   │   ├── ExamAnalysis.vue  #   考试分析
 │   │   │   ├── Homework.vue      #   作业追踪
 │   │   │   ├── StudyProgress.vue #   教材学习进度
 │   │   │   ├── ProjectWorks.vue  #   Big Task 作品
@@ -195,20 +202,25 @@ ChildStudy/
 │
 ├── start.bat                     # Windows 一键启动
 ├── start.sh                      # macOS/Linux 一键启动
-├── docs/                         # 参考文档（教材 PDF 等）
-│   └── 上海新版四上英语教材.pdf
 ├── README.md                     # 本文件
 ├── .gitignore
 └── LICENSE
 ```
 
-## 🗄️ 数据库 Schema（32 张表）
+## 🗄️ 数据库 Schema（33 张表）
+
+### 多用户认证
+| 表名 | 说明 |
+|------|------|
+| `families` | 家庭（v1.6.0 起数据按家庭隔离） |
+| `users` | 账号（parent/child 角色，归属家庭） |
 
 ### 核心业务
 | 表名 | 说明 |
 |------|------|
 | `children` | 孩子档案（姓名、年级、学校、生日） |
 | `exams` | 考试记录（科目、得分、排名、知识点） |
+| `exam_questions` | 考试-题目关联（含每题得分） |
 | `homeworks` | 作业记录（完成率、正确率、用时） |
 | `wrong_questions` | 错题本（题文、错因、掌握度、复习计划） |
 | `wrong_question_reviews` | 错题复习记录 |
@@ -253,7 +265,6 @@ ChildStudy/
 |------|------|
 | `ai_reports` | AI 学情报告（Markdown 存档） |
 | `grade_history` | 年级变更历史 |
-| `child_achievements` | 成就获得记录 |
 
 ## 🔌 API 概览
 
@@ -303,6 +314,8 @@ ChildStudy/
 | `/api/rewards/achievements` | GET/POST | 成就定义 CRUD |
 | `/api/rewards/achievements/{child_id}` | GET | 孩子成就 |
 | `/api/rewards/points-log/{child_id}` | GET | 积分流水 |
+| `/api/rewards/exam-reward/{exam_id}` | POST | 为考试补发积分/成就（幂等，同一考试只发一次） |
+| `/api/rewards/backfill/{child_id}` | POST | 回填某孩子全部考试/成就奖励（重跑不重复发分） |
 | `/api/question-banks` | GET/POST | 题库列表/创建 |
 | `/api/question-banks/{id}` | GET/PUT/DELETE | 单个题库 |
 | `/api/question-banks/{id}/questions` | GET/POST | 题目列表/创建 |
