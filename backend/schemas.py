@@ -1,7 +1,7 @@
 """Pydantic 数据校验模式（API 进出结构）"""
 from datetime import date, datetime
 from enum import Enum
-from typing import List, Optional
+from typing import List, Literal, Optional
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -523,11 +523,36 @@ class KPMatchCandidateOut(BaseModel):
     subject: str
     score: float
     match_reasons: List[str] = Field(default_factory=list)
+    # KP 是否能命中 KP 库（错题 KP 字符串 → KP id 解析用）
+    matched: bool = True
+    # 若已挂教材，附带 unit 标题（拼接 KP↔Unit 体系后输出）
+    unit_code: Optional[str] = None
+    unit_title_zh: Optional[str] = None
 
 
 class MatchSuggestionsOut(BaseModel):
     bank_matches: List[BankMatchCandidateOut] = Field(default_factory=list)
     kp_matches: List[KPMatchCandidateOut] = Field(default_factory=list)
+
+
+# KP 匹配来源（错题推荐时区分推荐路径）
+KPMatchLevel = Literal["primary", "kp_name_fallback", "unit_extend"]
+
+
+class MatchedQuestionOut(BaseModel):
+    id: int
+    bank_id: int
+    knowledge_point: str
+    difficulty: str
+    content: str
+    options: List[str] = Field(default_factory=list)
+    explanation: Optional[str] = None
+    # 对接新 KP 体系的产物
+    kp_match_level: str = "kp_name_fallback"  # primary / kp_name_fallback / unit_extend
+    matched_kp_ids: List[int] = Field(default_factory=list)  # 命中的 KP id
+    matched_kp_names: List[str] = Field(default_factory=list)
+    unit_code: Optional[str] = None  # 来源 Unit（如 U3）
+    unit_title_zh: Optional[str] = None  # 来源 Unit 标题
 
 
 class AcceptMatchRequest(BaseModel):
@@ -856,8 +881,10 @@ class ExerciseOut(BaseModel):
 
 class ExerciseRecommendation(BaseModel):
     wrong_questions: List[dict]
-    matched_questions: List[dict]
+    matched_questions: List[MatchedQuestionOut]
     suggestion: str
+    # 兼容新体系：本次推荐命中的 KP 列表（带 Unit 信息），家长可一眼看到薄弱点
+    recommended_kps: List[KPMatchCandidateOut] = Field(default_factory=list)
 
 # ============ 教材版本 / 单元 / 学习进度 / Project 作品 ============
 

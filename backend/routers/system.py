@@ -28,7 +28,7 @@ class UpgradeLog(BaseModel):
 
 
 # 当前版本（手动 bump，对应前端 package.json version）
-CURRENT_VERSION = "1.6.0"
+CURRENT_VERSION = "1.7.0"
 BUILD_TIME = "2026-09-01"
 
 
@@ -50,6 +50,13 @@ async def get_version():
 async def get_upgrade_log():
     """返回升级历史（当前仅返回模拟数据，后续接入真实 migration 日志）"""
     return [
+        UpgradeLog(
+            timestamp="2026-09-01T16:50:00",
+            from_version="1.6.0",
+            to_version="1.7.0",
+            status="success",
+            detail="新增: 错题推荐对接新知识点体系(QuestionKnowledgePoint多对多 + KP↔Unit 三层去重: primary主KP / unit_extend同Unit拓展 / kp_name_fallback字符串兜底). 孩子端看板(ChildDashboard)+ bootstrapChild自举 + 修改密码(/api/auth/change-password + Settings) + 路由守卫tokenValidated校验 + 全局错误兜底(errorHandler + unhandledrejection) + JWT_SECRET轮换 + 端口8000回归修复 + 匿名写knowledge-points/rewards补require_parent + vite build配置修复(v1.7.0).",
+        ),
         UpgradeLog(
             timestamp="2026-09-01T10:50:00",
             from_version="1.5.0",

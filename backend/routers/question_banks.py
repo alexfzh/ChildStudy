@@ -10,12 +10,25 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from database import get_db
 from dependencies import assert_child_access, get_accessible_child_ids, require_parent
-from models import Child, Exercise, Question, QuestionBank, WrongQuestion
+from models import (
+    Child,
+    Exercise,
+    KnowledgePoint,
+    KnowledgePointUnit,
+    Question,
+    QuestionBank,
+    QuestionKnowledgePoint,
+    QuestionUnit,
+    TextbookUnit,
+    WrongQuestion,
+)
 from schemas import (
     ExerciseOut,
     ExerciseRecommendation,
     ExerciseStartRequest,
     ExerciseSubmitRequest,
+    KPMatchCandidateOut,
+    MatchedQuestionOut,
     OkResponse,
     QuestionBankCreate,
     QuestionBankOut,
@@ -28,6 +41,81 @@ from schemas import (
 router = APIRouter(prefix="/api/question-banks", tags=["题库系统"])
 
 logger = logging.getLogger("childstudy")
+
+
+# ============ KP 解析工具：错题 KP 字符串 → 新知识点体系 ============
+
+async def _resolve_kps_by_names(
+    db: AsyncSession,
+    kp_names: List[str],
+    subject: str,
+) -> List[KnowledgePoint]:
+    """把错题本里的 KP 字符串集合（同一科目）解析为 KP 对象。
+
+    匹配策略（按优先级）：
+    1) name 精确匹配
+    2) name 包含/被包含的模糊匹配（处理「运算定律」vs「运算律」、「声音的高低」vs「声音的产生」等命名差异）
+    3) 找不到则丢弃（不强加，避免误关联）
+    """
+    if not kp_names:
+        return []
+
+    # 第一轮：精确匹配
+    name_set = list({n for n in kp_names if n})
+    exact_stmt = select(KnowledgePoint).where(
+        and_(KnowledgePoint.subject == subject, KnowledgePoint.name.in_(name_set))
+    )
+    kps = list((await db.execute(exact_stmt)).scalars().unique().all())
+
+    matched_names = {kp.name for kp in kps}
+    leftover = [n for n in name_set if n not in matched_names]
+    if not leftover:
+        return kps
+
+    # 第二轮：模糊匹配（LIKE 包含/被包含）
+    fuzzy_kps: List[KnowledgePoint] = []
+    for n in leftover:
+        like_stmt = select(KnowledgePoint).where(
+            and_(
+                KnowledgePoint.subject == subject,
+                KnowledgePoint.name.like(f"%{n}%"),
+            )
+        )
+        cands = list((await db.execute(like_stmt)).scalars().unique().all())
+        if cands:
+            # 优先挑名字最短的（最贴合）
+            cands.sort(key=lambda k: len(k.name))
+            best = cands[0]
+            if best.id not in {k.id for k in kps}:
+                fuzzy_kps.append(best)
+    kps.extend(fuzzy_kps)
+    return kps
+
+
+async def _attach_unit_info(
+    db: AsyncSession,
+    kps: List[KnowledgePoint],
+) -> dict:
+    """给一批 KP 挂上 Unit 信息（code + title_zh）。
+
+    返回 {kp_id: {"unit_code": "U3", "unit_title_zh": "..."}, ...}
+    如果某个 KP 挂多个 Unit，取第一个（primary 优先）。
+    """
+    if not kps:
+        return {}
+    kp_ids = [k.id for k in kps]
+    stmt = (
+        select(KnowledgePointUnit.knowledge_point_id, TextbookUnit.code, TextbookUnit.title_zh, KnowledgePointUnit.relevance)
+        .join(TextbookUnit, TextbookUnit.id == KnowledgePointUnit.unit_id)
+        .where(KnowledgePointUnit.knowledge_point_id.in_(kp_ids))
+        .order_by(KnowledgePointUnit.knowledge_point_id, KnowledgePointUnit.relevance.asc())
+    )
+    rows = (await db.execute(stmt)).all()
+    info = {}
+    for kp_id, code, title_zh, relevance in rows:
+        if kp_id not in info:  # 第一个出现的（已按 primary 排前）
+            info[kp_id] = {"unit_code": code, "unit_title_zh": title_zh}
+    return info
 
 
 # ============ 题库分组 CRUD ============
@@ -122,13 +210,51 @@ async def start_exercise(
         if not matched_wqs:
             raise HTTPException(400, "没有匹配的错题记录")
 
-        kps = set()
-        for wq in matched_wqs:
-            kps.update(wq.knowledge_points or [])
+        # 取主要科目
+        from collections import Counter
+        subj_counter = Counter(wq.subject for wq in matched_wqs)
+        primary_subject = subj_counter.most_common(1)[0][0]
 
-        if kps:
-            conditions = [Question.knowledge_point.in_(list(kps))]
-            stmt = stmt.where(*conditions)
+        # 收集错题 KP 字符串（按主科目过滤）
+        kp_names = set()
+        for wq in matched_wqs:
+            if wq.subject == primary_subject:
+                kp_names.update(wq.knowledge_points or [])
+
+        if kp_names:
+            # 第一路径：QKP 多对多 → KP id → 题目（最精准）
+            resolved_kps = await _resolve_kps_by_names(db, list(kp_names), primary_subject)
+            qkp_qids: List[int] = []
+            if resolved_kps:
+                qkp_rows = (await db.execute(
+                    select(QuestionKnowledgePoint.question_id)
+                    .join(KnowledgePoint, KnowledgePoint.id == QuestionKnowledgePoint.knowledge_point_id)
+                    .where(
+                        and_(
+                            QuestionKnowledgePoint.knowledge_point_id.in_([k.id for k in resolved_kps]),
+                            KnowledgePoint.subject == primary_subject,
+                        )
+                    )
+                )).all()
+                qkp_qids = list({row[0] for row in qkp_rows})
+
+            # 兜底：字符串字段（兼容 QKP 没覆盖的老题）
+            fb_stmt = select(Question).where(
+                and_(
+                    Question.bank_id == data.bank_id,
+                    Question.knowledge_point.in_(list(kp_names)),
+                    ~Question.id.in_(qkp_qids) if qkp_qids else True,
+                )
+            )
+            fb_qs = list((await db.execute(fb_stmt)).scalars().unique().all())
+            fb_qids = [q.id for q in fb_qs]
+
+            all_qids = list({*qkp_qids, *fb_qids})
+            if all_qids:
+                stmt = stmt.where(Question.id.in_(all_qids))
+            else:
+                # 兜底也找不到，回退到全题库随机
+                pass
     else:
         if data.knowledge_points:
             stmt = stmt.where(Question.knowledge_point.in_(data.knowledge_points))
@@ -323,7 +449,15 @@ async def recommend_questions(
     db: AsyncSession = Depends(get_db),
     accessible: set[int] = Depends(get_accessible_child_ids),
 ):
-    """根据错题本推荐练习题"""
+    """根据错题本推荐练习题（新知识点体系版）。
+
+    推荐三层去重合并（按优先级）：
+    1) primary —— 错题 KP 字符串 → KP id → QuestionKnowledgePoint 主关联（is_primary=True 优先）
+    2) kp_name_fallback —— 兜底查 Question.knowledge_point 字符串字段（兼容未建 QKP 关联的老题）
+    3) unit_extend —— 错题 KP 关联的同 Unit 其他 KP 的题（同单元横向拓展）
+
+    返回每道题带 kp_match_level / matched_kp_ids / unit_code，方便前端区分推荐来源。
+    """
     assert_child_access(accessible, child_id)
     wq_stmt = (
         select(WrongQuestion)
@@ -343,32 +477,241 @@ async def recommend_questions(
         return ExerciseRecommendation(
             wrong_questions=[],
             matched_questions=[],
+            recommended_kps=[],
             suggestion="目前错题本中没有未掌握的错题，继续保持！可以主动去题库做题来巩固。",
         )
 
-    kp_set = set()
+    # 取主要科目（按错题出现次数）
+    from collections import Counter
+    subj_counter = Counter(wq.subject for wq in wrong_questions)
+    primary_subject = subj_counter.most_common(1)[0][0]
+
+    # 收集错题 KP 字符串集合（按主科目过滤）
+    wq_kp_names = set()
     for wq in wrong_questions:
-        kp_set.update(wq.knowledge_points or [])
+        if wq.subject == primary_subject:
+            wq_kp_names.update(wq.knowledge_points or [])
+
+    # 字符串 → KP id（同时挂 Unit 信息）
+    matched_kps = await _resolve_kps_by_names(db, list(wq_kp_names), primary_subject)
+    unit_info = await _attach_unit_info(db, matched_kps)
+
+    # 同 Unit 拓展：拿到这些 KP 关联的所有 Unit 的其他 KP
+    if unit_info:
+        # 拿到错题 KP 关联的所有 unit_id
+        unit_ids_rows = (await db.execute(
+            select(KnowledgePointUnit.unit_id)
+            .where(KnowledgePointUnit.knowledge_point_id.in_(list(unit_info.keys())))
+        )).all()
+        unit_ids = list({row[0] for row in unit_ids_rows})
+        # 同 Unit 其他 KP（排除自身）
+        if unit_ids:
+            extend_kp_stmt = (
+                select(KnowledgePoint)
+                .join(KnowledgePointUnit, KnowledgePointUnit.knowledge_point_id == KnowledgePoint.id)
+                .where(
+                    and_(
+                        KnowledgePointUnit.unit_id.in_(unit_ids),
+                        KnowledgePoint.subject == primary_subject,
+                        ~KnowledgePoint.id.in_(list(unit_info.keys())),
+                    )
+                )
+                .limit(10)
+            )
+            extend_kps = list((await db.execute(extend_kp_stmt)).scalars().unique().all())
+            extend_unit_info = await _attach_unit_info(db, extend_kps)
+        else:
+            extend_kps = []
+            extend_unit_info = {}
+    else:
+        extend_kps = []
+        extend_unit_info = {}
+
+    # ── 第一层：primary（QKP 主关联）──
+    primary_qids: List[int] = []
+    primary_qid_to_meta: dict = {}  # qid -> {matched_kp_ids, matched_kp_names, unit_code, unit_title_zh}
+    if matched_kps:
+        primary_stmt = (
+            select(
+                QuestionKnowledgePoint.question_id,
+                QuestionKnowledgePoint.knowledge_point_id,
+                QuestionKnowledgePoint.is_primary,
+                KnowledgePoint.name,
+            )
+            .join(KnowledgePoint, KnowledgePoint.id == QuestionKnowledgePoint.knowledge_point_id)
+            .where(
+                and_(
+                    QuestionKnowledgePoint.knowledge_point_id.in_([k.id for k in matched_kps]),
+                    KnowledgePoint.subject == primary_subject,
+                )
+            )
+            .order_by(QuestionKnowledgePoint.is_primary.desc())
+        )
+        rows = (await db.execute(primary_stmt)).all()
+        for qid, kp_id, is_primary, kp_name in rows:
+            if qid not in primary_qid_to_meta:
+                primary_qid_to_meta[qid] = {
+                    "matched_kp_ids": [kp_id],
+                    "matched_kp_names": [kp_name],
+                    "unit_code": (unit_info.get(kp_id) or {}).get("unit_code"),
+                    "unit_title_zh": (unit_info.get(kp_id) or {}).get("unit_title_zh"),
+                }
+                primary_qids.append(qid)
+            else:
+                # 同一题关联多 KP：累加
+                meta = primary_qid_to_meta[qid]
+                if kp_id not in meta["matched_kp_ids"]:
+                    meta["matched_kp_ids"].append(kp_id)
+                    meta["matched_kp_names"].append(kp_name)
+
+    # ── 第二层：unit_extend（拓展 KP 的 QKP 题）──
+    extend_qids: List[int] = []
+    extend_qid_to_meta: dict = {}
+    if extend_kps:
+        extend_stmt = (
+            select(
+                QuestionKnowledgePoint.question_id,
+                QuestionKnowledgePoint.knowledge_point_id,
+                KnowledgePoint.name,
+            )
+            .join(KnowledgePoint, KnowledgePoint.id == QuestionKnowledgePoint.knowledge_point_id)
+            .where(
+                and_(
+                    QuestionKnowledgePoint.knowledge_point_id.in_([k.id for k in extend_kps]),
+                    KnowledgePoint.subject == primary_subject,
+                )
+            )
+            .limit(15)
+        )
+        rows = (await db.execute(extend_stmt)).all()
+        for qid, kp_id, kp_name in rows:
+            if qid in primary_qid_to_meta:
+                continue  # 已 primary 覆盖
+            if qid not in extend_qid_to_meta:
+                extend_qid_to_meta[qid] = {
+                    "matched_kp_ids": [kp_id],
+                    "matched_kp_names": [kp_name],
+                    "unit_code": (extend_unit_info.get(kp_id) or {}).get("unit_code"),
+                    "unit_title_zh": (extend_unit_info.get(kp_id) or {}).get("unit_title_zh"),
+                }
+                extend_qids.append(qid)
+
+    # ── 第三层：kp_name_fallback（兜底查 Question.knowledge_point 字符串字段）──
+    fallback_qids: List[int] = []
+    fallback_qid_to_meta: dict = {}
+    if wq_kp_names:
+        fb_stmt = select(Question).where(
+            and_(
+                Question.knowledge_point.in_(list(wq_kp_names)),
+                ~Question.id.in_(primary_qids + extend_qids),
+            )
+        ).limit(10)
+        fb_qs = list((await db.execute(fb_stmt)).scalars().unique().all())
+        for q in fb_qs:
+            # 用字符串本身匹配 KP（取第一个匹配的 KP id）
+            kp_name = q.knowledge_point
+            kp_id_match = next((k.id for k in matched_kps if k.name == kp_name), None)
+            fallback_qids.append(q.id)
+            fallback_qid_to_meta[q.id] = {
+                "matched_kp_ids": [kp_id_match] if kp_id_match else [],
+                "matched_kp_names": [kp_name] if kp_name else [],
+                "unit_code": (unit_info.get(kp_id_match) or {}).get("unit_code") if kp_id_match else None,
+                "unit_title_zh": (unit_info.get(kp_id_match) or {}).get("unit_title_zh") if kp_id_match else None,
+            }
+
+    # ── 拼装 MatchedQuestionOut ──
+    all_qids = primary_qids + extend_qids + fallback_qids
+    if not all_qids:
+        return ExerciseRecommendation(
+            wrong_questions=[
+                {
+                    "id": wq.id,
+                    "subject": wq.subject,
+                    "question_text": wq.question_text,
+                    "knowledge_points": wq.knowledge_points,
+                    "mastery_level": wq.mastery_level,
+                }
+                for wq in wrong_questions
+            ],
+            matched_questions=[],
+            recommended_kps=[
+                KPMatchCandidateOut(
+                    knowledge_point_id=k.id,
+                    name=k.name,
+                    subject=k.subject,
+                    score=0.0,
+                    matched=True,
+                    unit_code=(unit_info.get(k.id) or {}).get("unit_code"),
+                    unit_title_zh=(unit_info.get(k.id) or {}).get("unit_title_zh"),
+                )
+                for k in matched_kps
+            ],
+            suggestion=f"识别到错题 KP：{'、'.join(k.name for k in matched_kps[:5])}，但题库里暂无对应的练习题，可先去录入题目。",
+        )
+
+    q_meta_map = {q.id: q for q in (await db.execute(
+        select(Question).where(Question.id.in_(all_qids))
+    )).scalars().unique().all()}
+
+    def _to_out(qid: int, level: str, meta: dict) -> MatchedQuestionOut:
+        q = q_meta_map.get(qid)
+        if not q:
+            return None
+        return MatchedQuestionOut(
+            id=q.id,
+            bank_id=q.bank_id,
+            knowledge_point=q.knowledge_point,
+            difficulty=q.difficulty,
+            content=q.content,
+            options=q.options or [],
+            explanation=q.explanation,
+            kp_match_level=level,
+            matched_kp_ids=meta["matched_kp_ids"],
+            matched_kp_names=meta["matched_kp_names"],
+            unit_code=meta["unit_code"],
+            unit_title_zh=meta["unit_title_zh"],
+        )
 
     matched = []
-    if kp_set:
-        q_stmt = select(Question).where(Question.knowledge_point.in_(list(kp_set))).limit(20)
-        q_result = await db.execute(q_stmt)
-        matched = [
-            {
-                "id": q.id,
-                "bank_id": q.bank_id,
-                "knowledge_point": q.knowledge_point,
-                "difficulty": q.difficulty,
-                "content": q.content,
-                "options": q.options,
-                "explanation": q.explanation,
-            }
-            for q in q_result.scalars().unique().all()
-        ]
+    for qid in primary_qids:
+        out = _to_out(qid, "primary", primary_qid_to_meta[qid])
+        if out:
+            matched.append(out)
+    for qid in extend_qids:
+        out = _to_out(qid, "unit_extend", extend_qid_to_meta[qid])
+        if out:
+            matched.append(out)
+    for qid in fallback_qids:
+        out = _to_out(qid, "kp_name_fallback", fallback_qid_to_meta[qid])
+        if out:
+            matched.append(out)
 
-    kp_str = "、".join(list(kp_set)[:3])
-    suggestion = f"你最近在「{kp_str}」等知识点上还有错题，推荐做 {min(len(matched), 5)} 道相关练习巩固。"
+    # 截断到 20 条
+    matched = matched[:20]
+
+    # ── 建议文案 ──
+    primary_kp_str = "、".join(k.name for k in matched_kps[:3])
+    unit_codes = sorted({(unit_info.get(k.id) or {}).get("unit_code") for k in matched_kps if (unit_info.get(k.id) or {}).get("unit_code")})
+    unit_hint = f"（涉及单元：{'、'.join(unit_codes)}）" if unit_codes else ""
+    suggestion = (
+        f"你最近在「{primary_kp_str}」等知识点还有薄弱，"
+        f"已用 QKP 多对多表定位 {len(primary_qids)} 道主 KP 题、"
+        f"{len(extend_qids)} 道同 Unit 拓展题、{len(fallback_qids)} 道兜底题"
+        f"{unit_hint}，推荐做 {min(len(matched), 5)} 道巩固。"
+    )
+
+    recommended_kps = [
+        KPMatchCandidateOut(
+            knowledge_point_id=k.id,
+            name=k.name,
+            subject=k.subject,
+            score=0.0,
+            matched=True,
+            unit_code=(unit_info.get(k.id) or {}).get("unit_code"),
+            unit_title_zh=(unit_info.get(k.id) or {}).get("unit_title_zh"),
+        )
+        for k in matched_kps
+    ]
 
     return ExerciseRecommendation(
         wrong_questions=[
@@ -382,6 +725,7 @@ async def recommend_questions(
             for wq in wrong_questions
         ],
         matched_questions=matched,
+        recommended_kps=recommended_kps,
         suggestion=suggestion,
     )
 

@@ -16,7 +16,7 @@
               <el-radio value="recommend">💡 错题推荐</el-radio>
             </el-radio-group>
             <div v-if="form.mode === 'recommend'" class="mt-2 text-xs text-amber-600 bg-amber-50 p-2 rounded">
-              💡 系统将根据错题本的薄弱知识点自动匹配题目
+              💡 系统将根据错题本的薄弱知识点自动匹配题目（新 KP 体系：主 KP 优先 + 同单元拓展 + 兜底）
             </div>
           </div>
 

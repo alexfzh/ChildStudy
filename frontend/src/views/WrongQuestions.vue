@@ -492,10 +492,11 @@ const goToExercise = async () => {
 
         <!-- 知识点匹配 -->
         <div v-if="matchSuggestions.kp_matches && matchSuggestions.kp_matches.length" class="mb-3">
-          <div class="text-xs text-slate-500 mb-1">💡 推测知识点：</div>
+          <div class="text-xs text-slate-500 mb-1">💡 推测知识点（新 KP 体系）：</div>
           <div class="flex flex-wrap gap-1">
             <span v-for="m in matchSuggestions.kp_matches" :key="m.knowledge_point_id" class="text-xs px-2 py-0.5 rounded bg-indigo-100 text-indigo-700 flex items-center gap-1">
               {{ m.name }}
+              <span v-if="m.unit_code" class="text-[10px] text-indigo-400">·{{ m.unit_code }}</span>
               <span class="text-[10px] text-indigo-500">({{ Math.round(m.score * 100) }}%)</span>
               <button class="text-indigo-400 hover:text-indigo-600" @click="applyKPMatch(createdId.value, m)">+</button>
             </span>

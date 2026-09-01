@@ -2,7 +2,7 @@
 
 > 隐私优先的家庭学情追踪平台 · 数据完全本地存储 · AI 分析靠"导出→外部AI→粘回"
 
-![version](https://img.shields.io/badge/version-1.6.0-blue) ![license](https://img.shields.io/badge/license-MIT-green) ![privacy](https://img.shields.io/badge/privacy-100%25%20local-orange)
+![version](https://img.shields.io/badge/version-1.7.0-blue) ![license](https://img.shields.io/badge/license-MIT-green) ![privacy](https://img.shields.io/badge/privacy-100%25%20local-orange)
 
 ## ✨ 核心理念
 

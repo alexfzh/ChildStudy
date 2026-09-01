@@ -206,9 +206,36 @@ async def _run_smart_match(
 
     kp_matches = match_knowledge_points(text, subject, kp_candidates, top_k=5)
 
+    # 给候选 KP 挂上 Unit 信息（教材对接新 KP 体系）
+    kp_ids = [m.knowledge_point_id for m in kp_matches]
+    unit_info: dict = {}
+    if kp_ids:
+        from models import KnowledgePointUnit, TextbookUnit
+        unit_rows = (await db.execute(
+            select(KnowledgePointUnit.knowledge_point_id, TextbookUnit.code, TextbookUnit.title_zh)
+            .join(TextbookUnit, TextbookUnit.id == KnowledgePointUnit.unit_id)
+            .where(KnowledgePointUnit.knowledge_point_id.in_(kp_ids))
+            .order_by(KnowledgePointUnit.knowledge_point_id)
+        )).all()
+        for kp_id, code, title_zh in unit_rows:
+            if kp_id not in unit_info:
+                unit_info[kp_id] = (code, title_zh)
+
     return MatchSuggestionsOut(
         bank_matches=[BankMatchCandidateOut(**m.__dict__) for m in bank_matches],
-        kp_matches=[KPMatchCandidateOut(**m.__dict__) for m in kp_matches],
+        kp_matches=[
+            KPMatchCandidateOut(
+                knowledge_point_id=m.knowledge_point_id,
+                name=m.name,
+                subject=m.subject,
+                score=m.score,
+                match_reasons=m.match_reasons,
+                matched=True,
+                unit_code=unit_info.get(m.knowledge_point_id, (None, None))[0],
+                unit_title_zh=unit_info.get(m.knowledge_point_id, (None, None))[1],
+            )
+            for m in kp_matches
+        ],
     )
 
 
