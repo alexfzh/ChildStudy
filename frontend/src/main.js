@@ -15,8 +15,6 @@ dayjs.extend(utc);
 dayjs.extend(timezone);
 dayjs.tz.setDefault("Asia/Shanghai");
 
-export default dayjs;
-
 const app = createApp(App);
 
 // 全局错误边界：集中捕获组件渲染/生命周期/事件处理中的未捕获错误，
