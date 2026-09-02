@@ -462,6 +462,22 @@ class Exercise(Base):
     child: Mapped["Child"] = relationship()
     bank: Mapped["QuestionBank"] = relationship(back_populates="exercises")
 
+    @property
+    def bank_title(self) -> str:
+        """供 API 返回时使用：问题库标题（避免前端需额外查题库表）。
+
+        依赖 bank 关系已加载；如果未加载会触发 lazy load，在异步上下文外会报
+        MissingGreenlet。这里返回空串作为安全默认值，调用方应保证 selectinload 或显式赋值。
+        """
+        bank = self.bank
+        if bank is None:
+            return ""
+        try:
+            return bank.title or ""
+        except Exception:
+            # lazy load 触发 IO 时会进 async 上下文外 → MissingGreenlet；返回空串
+            return ""
+
 
 # ============ 教材版本 / 单元系统（与题库对接） ============
 
@@ -627,6 +643,32 @@ class KPStudyProgress(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now(timezone.utc))
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now(timezone.utc), onupdate=datetime.now(timezone.utc))
 
+
+
+# ============ 学情周报/月报（v1.7.0）============
+
+class PeriodicReport(Base):
+    """学情周报/月报（PDF 报告历史记录）
+
+    - period_type: weekly / monthly
+    - period_start / period_end: 报告覆盖的时间区间
+    - pdf_path: 生成的 PDF 文件相对路径（reports/{child_id}/{id}.pdf）
+    - file_size: PDF 字节数
+    - overview_json: 报告聚合数据的 JSON 快照（用于回查或重新生成时不重算）
+    """
+    __tablename__ = "periodic_reports"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    child_id: Mapped[int] = mapped_column(ForeignKey("children.id", ondelete="CASCADE"), index=True)
+    period_type: Mapped[str] = mapped_column(String(16), index=True)  # weekly / monthly
+    period_start: Mapped[date] = mapped_column(Date, index=True)
+    period_end: Mapped[date] = mapped_column(Date, index=True)
+    pdf_path: Mapped[str] = mapped_column(String(512))  # 相对路径
+    file_size: Mapped[int] = mapped_column(Integer, default=0)
+    overview_json: Mapped[Optional[str]] = mapped_column(Text, nullable=True)  # 报告概览 JSON
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now(timezone.utc), index=True)
+
+    child: Mapped["Child"] = relationship()
 
 
 # ============ 多用户认证（v1.6.0）============

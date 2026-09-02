@@ -363,6 +363,26 @@ class ContextExportResponse(BaseModel):
     context_markdown: str
 
 
+# ============ 学情周报/月报（v1.7.0）============
+
+class PeriodicReportOut(BaseModel):
+    """学情周报/月报（列表项）"""
+    id: int
+    child_id: int
+    period_type: str
+    period_start: date
+    period_end: date
+    file_size: int
+    download_url: str  # 相对路径：/api/reports/{id}/download
+    created_at: datetime
+
+
+class PeriodicReportGenerateRequest(BaseModel):
+    """生成周报/月报请求"""
+    period_type: str = "weekly"  # weekly / monthly
+    period_end: Optional[date] = None  # 默认今天；可指定过去某天
+
+
 # ============ Dashboard ============
 class SubjectStat(BaseModel):
     subject: str
@@ -868,6 +888,7 @@ class ExerciseOut(BaseModel):
     id: int
     child_id: int
     bank_id: int
+    bank_title: str = ""  # v1.8.0: 联表返回题库标题，看板直接用（避免 N+1：list 端点 selectinload）
     questions: List[dict]
     answers: List[dict]
     score: Optional[float]
@@ -876,6 +897,11 @@ class ExerciseOut(BaseModel):
     submitted_at: Optional[datetime]
     time_spent: Optional[int] = None
     created_at: datetime
+    # v1.8.0 激励：本次练习获得的积分、今日累计、本次解锁的新成就
+    points_earned: int = 0
+    daily_points_total: int = 0
+    daily_points_cap: int = 10
+    new_achievements: List["ChildAchievementOut"] = Field(default_factory=list)
     model_config = ConfigDict(from_attributes=True)
 
 

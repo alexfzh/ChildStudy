@@ -101,6 +101,12 @@ export const reportsAPI = {
   remove: (id) => api.delete(`/reports/${id}`).then((r) => r.data),
   exportContext: (childId, periodDays = 90) =>
     api.get("/reports/export/context", { params: { child_id: childId, period_days: periodDays } }).then((r) => r.data),
+  // 学情周报/月报（v1.7.0）
+  generatePeriod: (childId, payload) =>
+    api.post("/reports/period/generate", payload, { params: { child_id: childId } }).then((r) => r.data),
+  listPeriod: (childId) =>
+    api.get("/reports/period/list", { params: { child_id: childId } }).then((r) => r.data),
+  deletePeriod: (id) => api.delete(`/reports/period/${id}`).then((r) => r.data),
 };
 
 export default api;

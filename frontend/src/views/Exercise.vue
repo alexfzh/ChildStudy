@@ -77,8 +77,8 @@
     </div>
 
     <!-- 阶段2：答题中 -->
-    <div v-else-if="phase === 'taking'" class="space-y-6">
-      <div class="flex items-center justify-between">
+    <div v-else-if="phase === 'taking'" class="space-y-4">
+      <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
           <h2 class="text-lg font-semibold text-slate-800">答题中</h2>
           <div class="flex items-center gap-3 text-sm text-slate-500">
@@ -87,16 +87,16 @@
             <span class="font-mono">⏱ {{ formattedTime }}</span>
           </div>
         </div>
-        <div class="flex items-center gap-3">
+        <div class="flex items-center gap-3 flex-wrap">
           <div class="flex items-center gap-1.5 flex-wrap">
             <span class="text-xs text-slate-500 mr-1">答题进度</span>
             <button
               v-for="(q, idx) in exercise.questions"
               :key="q.id"
-              class="w-9 h-9 md:w-8 md:h-8 rounded text-sm font-medium transition-all flex-shrink-0"
+              class="w-10 h-10 md:w-8 md:h-8 rounded-lg text-sm font-medium transition-all flex-shrink-0 active:scale-95"
               :class="isAnswered(q.id)
-                ? 'bg-green-500 text-white'
-                : 'bg-slate-200 text-slate-500 hover:bg-slate-300'"
+                ? 'bg-green-500 text-white shadow-sm'
+                : 'bg-slate-200 text-slate-500 hover:bg-slate-300 active:bg-slate-300'"
               :title="`第${idx+1}题`"
               @click="currentIndex = idx"
             >
@@ -109,7 +109,7 @@
           <el-button
             type="primary"
             size="large"
-            class="!text-base !font-semibold"
+            class="!text-base !font-semibold !min-h-[48px]"
             :disabled="answeredCount < exercise.questions.length"
             @click="submitAll"
           >
@@ -129,46 +129,46 @@
             </div>
           </div>
 
-          <div v-if="currentQuestion.question_type === 'true_false'" class="flex gap-4 pl-10">
+          <div v-if="currentQuestion.question_type === 'true_false'" class="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <label
               v-for="(opt, idx) in currentQuestion.options"
               :key="idx"
-              class="flex-1 flex items-center justify-center gap-2 p-4 rounded-xl border-2 cursor-pointer transition-all text-base font-medium"
+              class="answer-option flex items-center justify-center gap-2 p-4 rounded-xl border-2 text-base font-medium"
               :class="selectedAnswer === String.fromCharCode(65 + idx)
                 ? 'border-green-500 bg-green-50 text-green-700'
                 : 'border-slate-200 hover:border-green-300 hover:bg-green-50/50 text-slate-600'"
               @click="selectAnswer(String.fromCharCode(65 + idx))"
             >
               <span
-                class="w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold flex-shrink-0"
+                class="w-9 h-9 rounded-full flex items-center justify-center text-sm font-bold flex-shrink-0"
                 :class="selectedAnswer === String.fromCharCode(65 + idx)
                   ? 'bg-green-500 text-white'
                   : 'bg-slate-100 text-slate-500'"
               >
                 {{ String.fromCharCode(65 + idx) }}
               </span>
-              <span>{{ opt }}</span>
+              <span class="text-base">{{ opt }}</span>
             </label>
           </div>
-          <div v-else class="space-y-2.5 pl-10">
+          <div v-else class="space-y-3">
             <label
               v-for="(opt, idx) in currentQuestion.options"
               :key="idx"
-              class="flex items-center gap-3 p-3 rounded-lg border-2 cursor-pointer transition-all"
+              class="answer-option flex items-center gap-3 p-4 rounded-xl border-2"
               :class="selectedAnswer === String.fromCharCode(65 + idx)
                 ? 'border-brand-500 bg-brand-50'
                 : 'border-slate-200 hover:border-slate-300 hover:bg-slate-50'"
               @click="selectAnswer(String.fromCharCode(65 + idx))"
             >
               <span
-                class="w-7 h-7 rounded-full flex items-center justify-center text-sm font-medium flex-shrink-0"
+                class="w-9 h-9 rounded-full flex items-center justify-center text-sm font-bold flex-shrink-0"
                 :class="selectedAnswer === String.fromCharCode(65 + idx)
                   ? 'bg-brand-500 text-white'
                   : 'bg-slate-100 text-slate-600'"
               >
                 {{ String.fromCharCode(65 + idx) }}
               </span>
-              <span class="text-sm text-slate-700">{{ opt.replace(/^[A-D]\.\s*/, "") }}</span>
+              <span class="text-base text-slate-700">{{ opt.replace(/^[A-D]\.\s*/, "") }}</span>
             </label>
           </div>
 
@@ -181,6 +181,7 @@
                 :disabled="currentIndex === 0"
                 @click="currentIndex--"
                 size="default"
+                class="!min-h-[44px]"
               >
                 ⬅ 上一题
               </el-button>
@@ -188,6 +189,7 @@
                 :disabled="currentIndex === exercise.questions.length - 1"
                 @click="currentIndex++"
                 size="default"
+                class="!min-h-[44px]"
               >
                 下一题 ➡
               </el-button>
@@ -196,6 +198,7 @@
                 size="default"
                 :disabled="answeredCount < exercise.questions.length"
                 @click="submitAll"
+                class="!min-h-[44px]"
               >
                 提交答案
               </el-button>

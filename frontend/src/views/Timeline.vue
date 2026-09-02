@@ -1,11 +1,14 @@
 <script setup>
-import { ref, onMounted, watch } from "vue";
+import { ref, computed, onMounted, watch } from "vue";
 import { ElMessage, ElMessageBox } from "element-plus";
 import dayjs from "dayjs";
 import { useChildStore } from "@/stores/child";
+import { useAuthStore } from "@/stores/auth";
 import { timelineAPI } from "@/api";
 
 const childStore = useChildStore();
+const auth = useAuthStore();
+const readOnly = computed(() => auth.isChild); // 孩子账号只能查看
 
 const loading = ref(false);
 const events = ref([]);
@@ -132,7 +135,10 @@ const grouped = () => {
         <h2 class="text-lg font-semibold text-slate-800">成长时间轴</h2>
         <p class="text-sm text-slate-500 mt-0.5">记录学习旅程中的重要时刻</p>
       </div>
-      <button class="btn-primary" @click="openCreate">+ 记录事件</button>
+      <button v-if="!readOnly" class="btn-primary" @click="openCreate">+ 记录事件</button>
+      <span v-else class="text-xs text-slate-400 bg-slate-50 border border-slate-200 px-3 py-1 rounded-full">
+        👀 只读模式
+      </span>
     </div>
 
     <div class="card p-3 mb-4 flex gap-2 flex-wrap items-center">
@@ -190,7 +196,7 @@ const grouped = () => {
                 <img v-for="(a, i) in e.attachments" :key="i" :src="a" class="w-16 h-16 object-cover rounded border border-slate-200" />
               </div>
             </div>
-            <div class="flex gap-1">
+            <div v-if="!readOnly" class="flex gap-1">
               <button class="btn-ghost text-xs" @click="openEdit(e)">编辑</button>
               <button class="btn-ghost text-xs text-rose-600" @click="remove(e)">删除</button>
             </div>

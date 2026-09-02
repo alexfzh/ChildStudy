@@ -15,6 +15,16 @@ dayjs.extend(utc);
 dayjs.extend(timezone);
 dayjs.tz.setDefault("Asia/Shanghai");
 
+// PWA: 生产环境注册 Service Worker（离线缓存静态资源）
+if ("serviceWorker" in navigator && import.meta.env.PROD) {
+  window.addEventListener("load", () => {
+    navigator.serviceWorker
+      .register("/sw.js")
+      .then((reg) => console.log("[PWA] Service Worker 注册成功:", reg.scope))
+      .catch((err) => console.warn("[PWA] Service Worker 注册失败:", err));
+  });
+}
+
 const app = createApp(App);
 
 // 全局错误边界：集中捕获组件渲染/生命周期/事件处理中的未捕获错误，
@@ -44,12 +54,3 @@ window.addEventListener("error", (e) => {
 window.addEventListener("unhandledrejection", (e) => {
   console.warn("[ChildStudy] 未处理的 Promise 拒绝：", e?.reason);
 });
-
-// PWA: 注册 service worker（生产环境启用，开发环境跳过）
-if ("serviceWorker" in navigator && import.meta.env.PROD) {
-  window.addEventListener("load", () => {
-    navigator.serviceWorker.register("/sw.js").catch(() => {
-      // SW 注册失败不影响主流程
-    });
-  });
-}

@@ -7,3 +7,6 @@ python-multipart==0.0.32
 python-dotenv==1.2.3
 aiosqlite==0.22.1
 starlette==1.6.0
+# 学情周报/月报 PDF 导出（v1.7.0）
+reportlab==5.0.1
+matplotlib==3.11.1

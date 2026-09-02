@@ -6,8 +6,8 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from database import get_db
-from dependencies import assert_child_access, child_id_filter, get_accessible_child_ids
-from models import Child, Timeline
+from dependencies import assert_child_access, child_id_filter, get_accessible_child_ids, require_parent
+from models import Child, Timeline, User
 from schemas import OkResponse, TimelineCreate, TimelineOut, TimelineUpdate
 
 router = APIRouter(prefix="/api/timeline", tags=["成长时间轴"])
@@ -42,6 +42,7 @@ async def list_events(
 @router.post("", response_model=TimelineOut, status_code=201)
 async def create_event(
     payload: TimelineCreate,
+    _parent: User = Depends(require_parent),  # 成长时间轴仅家长可写入
     db: AsyncSession = Depends(get_db),
     accessible: set[int] = Depends(get_accessible_child_ids),
 ):
@@ -60,6 +61,7 @@ async def create_event(
 async def update_event(
     event_id: int,
     payload: TimelineUpdate,
+    _parent: User = Depends(require_parent),
     db: AsyncSession = Depends(get_db),
     accessible: set[int] = Depends(get_accessible_child_ids),
 ):
@@ -77,6 +79,7 @@ async def update_event(
 @router.delete("/{event_id}", response_model=OkResponse)
 async def delete_event(
     event_id: int,
+    _parent: User = Depends(require_parent),
     db: AsyncSession = Depends(get_db),
     accessible: set[int] = Depends(get_accessible_child_ids),
 ):

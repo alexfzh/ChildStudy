@@ -40,8 +40,16 @@
           <el-option label="语文" value="语文" />
           <el-option label="科学" value="科学" />
         </el-select>
-        <el-button type="primary" plain @click="goToExercise" :disabled="!selectedBank">
-          🚀 去练习
+        <el-button
+          :type="selectedBank ? 'primary' : 'info'"
+          :plain="!selectedBank"
+          :disabled="!selectedBank"
+          size="large"
+          class="!text-base !px-5 !py-2"
+          @click="goToExercise"
+        >
+          <span v-if="selectedBank">🚀 去练习「{{ selectedBank.title }}」</span>
+          <span v-else>🚀 去练习（请先选中一个题库）</span>
         </el-button>
       </div>
     </el-card>
@@ -70,10 +78,19 @@
             <div class="mt-3 text-xs text-slate-400">
               共 <span class="text-brand-600 font-medium">{{ bank.question_count }}</span> 道题
             </div>
+            <!-- 卡内一键开始按钮（pad 上最明显的一键入口） -->
+            <el-button
+              type="primary"
+              size="large"
+              class="!w-full !mt-3 !text-base !font-semibold !min-h-[48px]"
+              @click.stop="selectAndGoExercise(bank)"
+            >
+              🚀 开始练习
+            </el-button>
           </div>
-          <div class="flex flex-col gap-1 ml-3">
-            <el-button size="small" @click.stop="editBank(bank)">编辑</el-button>
-            <el-button size="small" type="danger" @click.stop="deleteBank(bank)">删除</el-button>
+          <div class="flex flex-col gap-1.5 ml-3">
+            <el-button size="default" @click.stop="editBank(bank)">编辑</el-button>
+            <el-button size="default" type="danger" @click.stop="deleteBank(bank)">删除</el-button>
           </div>
         </div>
       </el-card>
@@ -92,18 +109,19 @@
         </el-button>
       </div>
 
-      <!-- 题目统计（可点击跳转到练习） -->
+      <!-- 题目统计（可点击跳转到练习，pad 上足够大的点击区域） -->
       <div class="flex flex-wrap gap-2 mb-4">
-        <el-tag
+        <button
           v-for="(cnt, kp) in questionStats"
           :key="kp"
-          type="info"
-          size="small"
-          class="cursor-pointer hover:!border-brand-400 transition-colors"
+          type="button"
+          class="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-slate-100 hover:bg-brand-50 hover:text-brand-700 hover:border-brand-300 border border-slate-200 text-slate-700 text-sm font-medium transition-colors cursor-pointer"
           @click.stop="goToExerciseWithKP(kp)"
         >
-          {{ kp }}: {{ cnt }} 题
-        </el-tag>
+          <span>📚 {{ kp }}</span>
+          <span class="text-xs opacity-70">· {{ cnt }} 题</span>
+          <span class="text-xs">🚀</span>
+        </button>
       </div>
 
       <!-- 题目列表 -->
@@ -317,6 +335,20 @@ async function fetchBanks() {
 function selectBank(bank) {
   selectedBank.value = bank;
   fetchQuestions(bank.id);
+}
+
+// 一键选中 + 去练习（题库卡片里的快速入口，跳过手动选中这一步）
+function selectAndGoExercise(bank) {
+  selectBank(bank);
+  const childId = childStore.current?.id;
+  if (!childId) {
+    ElMessage.warning("请先选择孩子");
+    return;
+  }
+  router.push({
+    name: "exercise",
+    query: { bank_id: bank.id, child_id: childId },
+  });
 }
 
 async function fetchQuestions(bankId) {

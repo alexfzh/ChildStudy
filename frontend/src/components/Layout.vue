@@ -58,9 +58,9 @@ const navGroups = [
   {
     label: "成长",
     items: [
-      { name: "timeline", path: "/timeline", label: "成长时间轴", icon: "🌱", roles: ["parent"] },
+      { name: "timeline", path: "/timeline", label: "成长时间轴", icon: "🌱", roles: ["parent", "child"] },
       { name: "project-works", path: "/project-works", label: "Big Task 作品", icon: "🎨", roles: ["parent", "child"] },
-      { name: "growth", path: "/growth", label: "生长发育", icon: "📏", roles: ["parent"] },
+      { name: "growth", path: "/growth", label: "生长发育", icon: "📏", roles: ["parent", "child"] },
       { name: "social-emotional", path: "/social-emotional", label: "社交情感", icon: "💭", roles: ["parent"] },
       { name: "interests", path: "/interests", label: "兴趣特长", icon: "🎨", roles: ["parent"] },
     ],
@@ -107,7 +107,7 @@ const closeSidebar = () => {
     <aside
       :class="[
         'bg-white border-r border-slate-200 flex flex-col flex-shrink-0 transition-transform duration-200',
-        'fixed md:relative inset-y-0 left-0 z-40 w-60',
+        'fixed md:relative inset-y-0 left-0 z-40 w-[260px]',
         sidebarOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0',
       ]"
     >
