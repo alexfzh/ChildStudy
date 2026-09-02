@@ -60,6 +60,7 @@ async def init_db():
         await _migrate_exam_paper_analysis(conn)
         await _migrate_exercise_time_spent(conn)
         await _migrate_auth_foundation(conn)
+        await _migrate_child_reward_status(conn)
 
 
 async def _migrate_data_quality(conn) -> None:
@@ -177,6 +178,34 @@ async def _migrate_exercise_time_spent(conn) -> None:
         text("ALTER TABLE exercises ADD COLUMN time_spent INTEGER")
     )
     logger.info("迁移完成：exercises.time_spent 已添加")
+
+
+async def _migrate_child_reward_status(conn) -> None:
+    """child_rewards 表加核销字段（status / used_at / used_by）。
+
+    幂等：逐列检测，不存在才 ALTER TABLE ADD COLUMN。
+    存量行默认 status='pending'（历史上兑换后无核销概念，视为待使用）。
+    """
+    from sqlalchemy import text
+
+    cols = {
+        "status": "VARCHAR(16) DEFAULT 'pending' NOT NULL",
+        "used_at": "DATETIME",
+        "used_by": "INTEGER",
+    }
+    for col, ddl in cols.items():
+        result = await conn.execute(
+            text(
+                "SELECT name FROM pragma_table_info('child_rewards')"
+                f" WHERE name = '{col}'"
+            )
+        )
+        if result.fetchone() is not None:
+            continue
+        await conn.execute(
+            text(f"ALTER TABLE child_rewards ADD COLUMN {col} {ddl}")
+        )
+        logger.info("迁移完成：child_rewards.%s 已添加", col)
 
 
 async def _migrate_auth_foundation(conn) -> None:

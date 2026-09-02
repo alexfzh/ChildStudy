@@ -343,6 +343,10 @@ class ChildReward(Base):
     note: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     earned_date: Mapped[date] = mapped_column(Date, default=date.today)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now(timezone.utc))
+    # 核销状态：pending=已兑换待使用；used=家长已核销（实物已交付）
+    status: Mapped[str] = mapped_column(String(16), default="pending")
+    used_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    used_by: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)  # 核销家长 user_id
 
     child: Mapped["Child"] = relationship()
     reward: Mapped["Reward"] = relationship()
@@ -718,3 +722,15 @@ class User(Base):
         # role 限定值（SQLite CHECK 约束靠 enum 不强，靠应用层校验）
         Index("ix_users_family_role", "family_id", "role"),
     )
+
+
+class Quote(Base):
+    """诗词 / 名言（孩子看板欢迎栏随机展示）"""
+    __tablename__ = "quotes"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    content: Mapped[str] = mapped_column(Text)  # 诗句或名言正文
+    author: Mapped[str] = mapped_column(String(64))  # 作者（诗词可含朝代，如 "唐·李白"）
+    source: Mapped[Optional[str]] = mapped_column(String(128), nullable=True)  # 出处，如《竹石》
+    category: Mapped[str] = mapped_column(String(16), default="poem", index=True)  # 'poem' | 'quote'
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now(timezone.utc))

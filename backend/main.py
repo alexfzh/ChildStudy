@@ -27,6 +27,7 @@ from routers import (
     project_works,
     question_banks,
     question_kp,
+    quotes,
     reports,
     rewards,
     social_emotional,
@@ -103,6 +104,7 @@ _PROTECTED = [
     kp_unit,
     question_kp,
     kp_progress,
+    quotes,
 ]
 for r in _PROTECTED:
     app.include_router(r.router, dependencies=[Depends(get_current_user)])

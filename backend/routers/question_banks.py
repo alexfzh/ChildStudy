@@ -529,12 +529,17 @@ async def list_exercises(
     db: AsyncSession = Depends(get_db),
     accessible: set[int] = Depends(get_accessible_child_ids),
 ):
-    """获取孩子的练习历史（含题库标题，方便看板直接用）"""
+    """获取孩子的练习历史（含题库标题，方便看板直接用）
+
+    排序：按交卷时间 submitted_at 倒序（未交卷的排最后，id 倒序兜底）。
+    不能用 created_at：批量创建的练习 created_at 相同，会导致顺序错乱，
+    且前端 dashboard 的「最近得分」取列表第一条，顺序错就会显示错分。
+    """
     result = await db.execute(
         select(Exercise)
         .where(Exercise.child_id == child_id)
         .options(selectinload(Exercise.bank))
-        .order_by(Exercise.created_at.desc())
+        .order_by(Exercise.submitted_at.desc().nullslast(), Exercise.id.desc())
     )
     return result.scalars().unique().all()
 

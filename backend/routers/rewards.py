@@ -1,11 +1,12 @@
 """奖励系统路由：段位 / 奖励商城 / 成就 / 积分"""
 import logging
 import re
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta, timezone
 from typing import List, Optional, Tuple
 
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import desc, func, select
+from sqlalchemy.orm import selectinload
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from database import get_db
@@ -723,7 +724,14 @@ async def redeem(
     db.add(cr)
     await db.commit()
     await db.refresh(cr)
-    return cr
+    # 手动构造返回，避免异步上下文 lazy load cr.reward 报错
+    return ChildRewardOut(
+        id=cr.id, child_id=cr.child_id, reward_id=cr.reward_id,
+        points_spent=cr.points_spent, source=cr.source, note=cr.note,
+        earned_date=cr.earned_date,
+        status=cr.status, used_at=cr.used_at, used_by=cr.used_by,
+        reward=RewardOut.model_validate(reward),
+    )
 
 
 @router.get("/history/{child_id}", response_model=List[ChildRewardOut])
@@ -735,6 +743,7 @@ async def redemption_history(
     assert_child_access(accessible, child_id)
     result = await db.execute(
         select(ChildReward)
+        .options(selectinload(ChildReward.reward))
         .where(ChildReward.child_id == child_id)
         .order_by(desc(ChildReward.created_at))
         .limit(50)
@@ -746,9 +755,43 @@ async def redemption_history(
             id=cr.id, child_id=cr.child_id, reward_id=cr.reward_id,
             points_spent=cr.points_spent, source=cr.source, note=cr.note,
             earned_date=cr.earned_date,
+            status=cr.status, used_at=cr.used_at, used_by=cr.used_by,
             reward=RewardOut.model_validate(cr.reward) if cr.reward else None,
         ))
     return out
+
+
+@router.post("/history/{cr_id}/mark-used", response_model=ChildRewardOut)
+async def mark_reward_used(
+    cr_id: int,
+    parent: User = Depends(require_parent),
+    db: AsyncSession = Depends(get_db),
+    accessible: set[int] = Depends(get_accessible_child_ids),
+):
+    """家长核销：把孩子已兑换的奖励标记为已使用（实物/权益已交付）。"""
+    result = await db.execute(
+        select(ChildReward)
+        .options(selectinload(ChildReward.reward))
+        .where(ChildReward.id == cr_id)
+    )
+    cr = result.scalars().first()
+    if not cr:
+        raise HTTPException(404, "兑换记录不存在")
+    assert_child_access(accessible, cr.child_id)
+    if cr.status == "used":
+        raise HTTPException(400, "该奖励已核销过")
+
+    cr.status = "used"
+    cr.used_at = datetime.now(timezone.utc)
+    cr.used_by = parent.id
+    await db.commit()
+    return ChildRewardOut(
+        id=cr.id, child_id=cr.child_id, reward_id=cr.reward_id,
+        points_spent=cr.points_spent, source=cr.source, note=cr.note,
+        earned_date=cr.earned_date,
+        status=cr.status, used_at=cr.used_at, used_by=cr.used_by,
+        reward=RewardOut.model_validate(cr.reward) if cr.reward else None,
+    )
 
 
 # ============ 成就 CRUD ============

@@ -9,6 +9,8 @@
     -webkit-touch-callout: none;
     -webkit-user-select: none;
     user-select: none;
+    /* 消除触摸设备上双击缩放延迟 / 手势误触发 */
+    touch-action: manipulation;
   }
   body {
     @apply text-slate-800 antialiased;
@@ -30,7 +32,7 @@
 
 @layer components {
   .btn {
-    @apply inline-flex items-center justify-center gap-1.5 px-4 py-2 rounded-lg font-medium text-sm transition-all disabled:opacity-50 disabled:cursor-not-allowed;
+    @apply inline-flex items-center justify-center gap-1.5 px-4 py-2 rounded-lg font-medium text-sm transition-all disabled:opacity-50 disabled:cursor-not-allowed active:scale-[0.97];
     /* 确保触摸目标 >= 44px */
     min-height: 44px;
     min-width: 44px;
@@ -78,6 +80,17 @@
     transform: scale(0.98);
     transition: transform 0.1s ease;
   }
+  /* 选中选项时的弹跳反馈（pad 触摸体验） */
+  .answer-option.border-green-500,
+  .answer-option.border-brand-500 {
+    animation: option-pop 0.28s ease;
+  }
+}
+
+@keyframes option-pop {
+  0% { transform: scale(1); }
+  45% { transform: scale(1.04); }
+  100% { transform: scale(1); }
 }
 
 /* 全局滚动条（触控优化） */

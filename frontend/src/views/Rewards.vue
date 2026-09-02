@@ -2,10 +2,13 @@
 import { ref, computed, onMounted, watch } from "vue";
 import { ElMessage, ElMessageBox } from "element-plus";
 import { useChildStore } from "@/stores/child";
+import { useAuthStore } from "@/stores/auth";
 import { rewardsAPI } from "@/api";
 
 const childStore = useChildStore();
+const authStore = useAuthStore();
 const childId = computed(() => childStore.current?.id);
+const isParent = computed(() => authStore.isParent);
 
 const loading = ref(false);
 const ranks = ref([]);
@@ -47,13 +50,54 @@ const redeem = async (item) => {
   } catch (e) { /* 取消 */ }
 };
 
+// 家长核销：把已兑换的奖励标记为已使用（实物/权益已交付）
+const markUsed = async (h) => {
+  try {
+    await ElMessageBox.confirm(
+      `确认「${h.reward?.name || '该奖励'}」已交付给孩子/已使用吗？核销后不可撤销。`,
+      "核销奖励",
+      { type: "warning", confirmButtonText: "确认核销", cancelButtonText: "再想想" }
+    );
+    await rewardsAPI.markRewardUsed(h.id);
+    ElMessage.success("已核销 ✅");
+    await fetchAll();
+  } catch (e) { /* 取消 */ }
+};
+
+// 兑换记录视图过滤：all=全部；pending=待使用；used=已核销
+const historyFilter = ref("all");
+const historyFilters = computed(() => {
+  const counts = { all: history.value.length, pending: 0, used: 0 };
+  for (const h of history.value) {
+    const st = h.status || "pending";
+    counts[st] = (counts[st] || 0) + 1;
+  }
+  return [
+    { key: "all", label: "全部", count: counts.all },
+    { key: "pending", label: "待使用", count: counts.pending },
+    { key: "used", label: "已核销", count: counts.used },
+  ];
+});
+const filteredHistory = computed(() => {
+  if (historyFilter.value === "all") return history.value;
+  return history.value.filter((h) => (h.status || "pending") === historyFilter.value);
+});
+
+const STATUS_META = {
+  pending: { label: "待使用", cls: "bg-amber-100 text-amber-700" },
+  used:    { label: "已核销", cls: "bg-emerald-100 text-emerald-600" },
+};
+const statusMeta = (st) => STATUS_META[st || "pending"] || STATUS_META.pending;
+
 // ============ 积分流水 ============
 // 积分来源 → 图标/标签的映射（与后端 PointsLog.source 枚举对齐）
 const SOURCE_META = {
-  exam_reward: { icon: "📝", label: "考试奖励", tone: "emerald" },
-  redemption:  { icon: "🛒", label: "商城兑换", tone: "rose" },
-  bonus:       { icon: "🎁", label: "额外奖励", tone: "amber" },
-  manual:      { icon: "✍️", label: "手动调整", tone: "slate" },
+  exam_reward:      { icon: "📝", label: "考试奖励", tone: "emerald" },
+  practice_perfect: { icon: "✏️", label: "练习奖励", tone: "sky" },
+  study_progress:   { icon: "📚", label: "学习进度", tone: "violet" },
+  redemption:       { icon: "🛒", label: "商城兑换", tone: "rose" },
+  bonus:            { icon: "🎁", label: "额外奖励", tone: "amber" },
+  manual:           { icon: "✍️", label: "手动调整", tone: "slate" },
 };
 const sourceMeta = (src) => SOURCE_META[src] || { icon: "·", label: src || "其他", tone: "slate" };
 
@@ -194,7 +238,7 @@ const earnedTitles = computed(() => {
         <div class="flex items-center gap-1.5 flex-wrap">
           <!-- 来源过滤 chip -->
           <button
-            v-for="src in ['all','exam_reward','redemption','bonus','manual']"
+            v-for="src in ['all','exam_reward','practice_perfect','study_progress','redemption']"
             :key="src"
             type="button"
             :disabled="!logSourceCounts[src]"
@@ -222,6 +266,8 @@ const earnedTitles = computed(() => {
                 <span class="inline-block px-1.5 py-0.5 rounded mr-1.5"
                   :class="{
                     'bg-emerald-100 text-emerald-700': log.source === 'exam_reward',
+                    'bg-sky-100 text-sky-700': log.source === 'practice_perfect',
+                    'bg-violet-100 text-violet-700': log.source === 'study_progress',
                     'bg-rose-100 text-rose-700': log.source === 'redemption',
                     'bg-amber-100 text-amber-700': log.source === 'bonus',
                     'bg-slate-100 text-slate-600': log.source === 'manual',
@@ -240,29 +286,70 @@ const earnedTitles = computed(() => {
 
       <!-- 折叠/展开控制 -->
       <div v-if="filteredLogs.length > 5" class="text-center mt-3">
-        <button class="btn-ghost text-xs" @click="showAllLogs = !showAllLogs">
+        <button class="btn-ghost text-sm" @click="showAllLogs = !showAllLogs">
           {{ showAllLogs ? '收起 ▴' : `查看全部 ${filteredLogs.length} 条 ▾` }}
         </button>
       </div>
       <div v-else-if="logFilter !== 'all'" class="text-center mt-3">
-        <button class="btn-ghost text-xs" @click="logFilter = 'all'">清除筛选</button>
+        <button class="btn-ghost text-sm" @click="logFilter = 'all'">清除筛选</button>
       </div>
     </div>
 
-    <!-- 兑换记录 -->
-    <div v-if="history.length" class="card p-5">
-      <h3 class="font-semibold text-slate-800 mb-3">📋 兑换记录</h3>
+    <!-- 已兑换物品（孩子视角看状态；家长可核销） -->
+    <div v-if="history.length" class="card p-5 mb-5">
+      <div class="flex items-center justify-between mb-3 flex-wrap gap-2">
+        <div>
+          <h3 class="font-semibold text-slate-800">🎒 已兑换物品</h3>
+          <p v-if="isParent" class="text-xs text-slate-400 mt-0.5">孩子兑换后，家长在此核销已交付的实物或权益</p>
+        </div>
+        <div class="flex items-center gap-1.5 flex-wrap">
+          <button
+            v-for="f in historyFilters"
+            :key="f.key"
+            type="button"
+            :disabled="!f.count"
+            class="px-2.5 py-0.5 rounded-full text-xs border transition select-none disabled:opacity-40 disabled:cursor-not-allowed"
+            :class="historyFilter === f.key ? 'bg-brand-500 text-white border-brand-500' : 'bg-white text-slate-500 border-slate-200 hover:border-brand-300'"
+            @click="historyFilter = f.key"
+          >
+            {{ f.label }}
+            <span class="ml-1 text-[10px] opacity-75">({{ f.count }})</span>
+          </button>
+        </div>
+      </div>
+
       <div class="space-y-2">
-        <div v-for="h in history" :key="h.id" class="flex items-center justify-between p-3 rounded-lg bg-slate-50">
-          <div class="flex items-center gap-3">
+        <div v-for="h in filteredHistory" :key="h.id"
+          class="flex items-center justify-between p-3 rounded-lg bg-slate-50"
+          :class="(h.status || 'pending') === 'used' ? 'opacity-70' : ''"
+        >
+          <div class="flex items-center gap-3 min-w-0">
             <span class="text-xl">{{ h.reward?.icon || '🎁' }}</span>
-            <div>
-              <div class="text-sm font-medium text-slate-700">{{ h.reward?.name || '未知奖励' }}</div>
-              <div class="text-xs text-slate-400">{{ h.earned_date }}</div>
+            <div class="min-w-0">
+              <div class="text-sm font-medium text-slate-700 flex items-center gap-2">
+                <span class="truncate">{{ h.reward?.name || '未知奖励' }}</span>
+                <span class="shrink-0 inline-block px-1.5 py-0.5 rounded-full text-[10px] font-medium"
+                  :class="statusMeta(h.status).cls">
+                  {{ statusMeta(h.status).label }}
+                </span>
+              </div>
+              <div class="text-xs text-slate-400 mt-0.5">
+                兑换于 {{ h.earned_date }}<template v-if="(h.status || 'pending') === 'used' && h.used_at"> · 核销于 {{ fmtDateTime(h.used_at) }}</template>
+              </div>
             </div>
           </div>
-          <div class="text-sm font-semibold text-rose-500">-{{ h.points_spent }}</div>
+          <div class="flex items-center gap-3 flex-shrink-0">
+            <div class="text-sm font-semibold text-rose-500">-{{ h.points_spent }}</div>
+            <button
+              v-if="isParent && (h.status || 'pending') !== 'used'"
+              class="btn-primary text-xs whitespace-nowrap"
+              @click="markUsed(h)"
+            >✅ 核销</button>
+          </div>
         </div>
+      </div>
+      <div v-if="historyFilter !== 'all' && filteredHistory.length === 0" class="text-center py-4 text-slate-400 text-sm">
+        该分类下暂无记录
       </div>
     </div>
   </div>

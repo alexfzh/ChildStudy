@@ -138,7 +138,7 @@ const closeSidebar = () => {
           <button
             v-if="group.items.filter(canSee).length"
             type="button"
-            class="flex items-center justify-between w-full px-3 py-2 text-sm font-semibold text-slate-500 hover:text-slate-700 hover:bg-slate-50 rounded-lg transition-colors cursor-pointer"
+            class="flex items-center justify-between w-full px-3 py-2.5 text-sm font-semibold text-slate-500 hover:text-slate-700 hover:bg-slate-50 rounded-lg transition-colors cursor-pointer active:scale-[0.98]"
             @click="toggleGroup(gIdx)"
           >
             <span>{{ group.label }}</span>
@@ -156,7 +156,7 @@ const closeSidebar = () => {
               v-for="item in group.items.filter(canSee)"
               :key="item.name"
               :to="item.path"
-              class="flex items-center gap-3 px-3 py-2 mb-0.5 rounded-lg text-sm font-medium transition-colors"
+              class="flex items-center gap-3 px-3 py-2.5 mb-0.5 rounded-lg text-sm font-medium transition-all active:scale-[0.98]"
               :class="route.name === item.name ? 'bg-brand-50 text-brand-600' : 'text-slate-600 hover:bg-slate-50'"
               @click="closeSidebar"
             >

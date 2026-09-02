@@ -2,7 +2,7 @@
 import { ref, computed, onMounted } from "vue";
 import { useRouter } from "vue-router";
 import { useAuthStore } from "@/stores/auth";
-import { rewardsAPI, wrongQuestionsAPI, dashboardAPI, questionBanksAPI } from "@/api";
+import { rewardsAPI, wrongQuestionsAPI, dashboardAPI, questionBanksAPI, quoteAPI } from "@/api";
 import dayjs from "dayjs";
 import TrendLineChart from "@/components/charts/TrendLineChart.vue";
 import RadarChart from "@/components/charts/RadarChart.vue";
@@ -20,6 +20,22 @@ const wrongStats = ref({ total: 0, active: 0, mastered: 0 });
 const dashboard = ref(null);
 // 练习汇总（v1.8.0）
 const recentExercises = ref([]);
+
+// 随机诗词 / 名言（欢迎栏展示，点击可换一条）
+const quote = ref(null);
+const quoteLoading = ref(false);
+
+async function loadQuote() {
+  if (quoteLoading.value) return;
+  quoteLoading.value = true;
+  try {
+    quote.value = await quoteAPI.random();
+  } catch (e) {
+    // 接口异常时静默，卡片不显示即可
+  } finally {
+    quoteLoading.value = false;
+  }
+}
 
 const availablePoints = computed(() => (points.value.earned || 0) - (points.value.spent || 0));
 
@@ -79,7 +95,10 @@ async function load() {
   }
 }
 
-onMounted(load);
+onMounted(() => {
+  load();
+  loadQuote();
+});
 
 function formatDuration(seconds) {
   const m = Math.floor(seconds / 60);
@@ -93,34 +112,82 @@ function formatDuration(seconds) {
   <div class="space-y-6">
     <!-- 欢迎 -->
     <div class="bg-gradient-to-br from-brand-500 to-brand-700 rounded-2xl px-6 py-7 text-white shadow-sm">
-      <div class="text-sm opacity-80">我的看板</div>
-      <div class="text-2xl font-semibold mt-1">👋 你好，{{ displayName }}！</div>
-      <div class="text-sm opacity-80 mt-1">这是专属于你的成长空间</div>
+      <div class="flex flex-col sm:flex-row sm:items-center gap-4">
+        <!-- 左：问候语 -->
+        <div class="shrink-0">
+          <div class="text-sm opacity-80">我的看板</div>
+          <div class="text-2xl font-semibold mt-1">👋 你好，{{ displayName }}！</div>
+          <div class="text-sm opacity-80 mt-1">这是专属于你的成长空间</div>
+        </div>
+        <!-- 右：随机诗词 / 名言（点击换一条） -->
+        <button
+          v-if="quote"
+          class="quote-banner w-full sm:ml-auto sm:max-w-sm text-left rounded-xl bg-white/10 border border-white/15 px-4 py-3 hover:bg-white/15 active:scale-[0.98] transition-all"
+          :disabled="quoteLoading"
+          title="点一下换一句"
+          @click="loadQuote"
+        >
+          <div class="flex items-start gap-2">
+            <span class="quote-mark text-xl leading-none select-none opacity-60">「</span>
+            <div class="min-w-0 flex-1">
+              <p
+                class="text-[13px] leading-relaxed font-medium"
+                :class="{ 'opacity-60': quoteLoading }"
+              >{{ quote.content }}</p>
+              <p class="text-[11px] opacity-75 mt-1">
+                —— {{ quote.author }}<template v-if="quote.source"> · {{ quote.source }}</template>
+              </p>
+            </div>
+            <span
+              class="text-sm opacity-60 select-none shrink-0 mt-0.5"
+              :class="{ 'animate-spin': quoteLoading }"
+            >⟳</span>
+          </div>
+        </button>
+      </div>
     </div>
 
-    <!-- 统计卡片 -->
+    <!-- 统计卡片（可点击跳转，适配触摸屏） -->
     <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
-      <div class="bg-white rounded-xl border border-slate-200 px-5 py-4 shadow-sm">
-        <div class="text-xs text-slate-400">可用积分</div>
+      <router-link
+        to="/rewards"
+        class="stat-card group"
+      >
+        <div class="flex items-center justify-between">
+          <div class="text-xs text-slate-400">可用积分</div>
+          <span class="text-slate-300 group-hover:text-amber-400 transition-colors text-sm">→</span>
+        </div>
         <div class="text-2xl font-bold text-amber-500 mt-1">
           {{ loading ? "…" : availablePoints }}
         </div>
-        <div class="text-[11px] text-slate-400 mt-1">累计获得 {{ points.earned || 0 }}</div>
-      </div>
-      <div class="bg-white rounded-xl border border-slate-200 px-5 py-4 shadow-sm">
-        <div class="text-xs text-slate-400">我的成就</div>
+        <div class="text-[11px] text-slate-400 mt-1">累计获得 {{ points.earned || 0 }} · 去商城逛逛</div>
+      </router-link>
+      <router-link
+        to="/achievements"
+        class="stat-card group"
+      >
+        <div class="flex items-center justify-between">
+          <div class="text-xs text-slate-400">我的成就</div>
+          <span class="text-slate-300 group-hover:text-brand-500 transition-colors text-sm">→</span>
+        </div>
         <div class="text-2xl font-bold text-brand-600 mt-1">
           {{ loading ? "…" : achievementCount }}
         </div>
-        <div class="text-[11px] text-slate-400 mt-1">枚勋章已点亮</div>
-      </div>
-      <div class="bg-white rounded-xl border border-slate-200 px-5 py-4 shadow-sm">
-        <div class="text-xs text-slate-400">待复习错题</div>
+        <div class="text-[11px] text-slate-400 mt-1">枚勋章已点亮 · 看看成就墙</div>
+      </router-link>
+      <router-link
+        to="/wrong-questions"
+        class="stat-card group"
+      >
+        <div class="flex items-center justify-between">
+          <div class="text-xs text-slate-400">待复习错题</div>
+          <span class="text-slate-300 group-hover:text-rose-400 transition-colors text-sm">→</span>
+        </div>
         <div class="text-2xl font-bold text-rose-500 mt-1">
           {{ loading ? "…" : (wrongStats.active || 0) }}
         </div>
-        <div class="text-[11px] text-slate-400 mt-1">共 {{ wrongStats.total || 0 }} 道</div>
-      </div>
+        <div class="text-[11px] text-slate-400 mt-1">共 {{ wrongStats.total || 0 }} 道 · 去复习</div>
+      </router-link>
     </div>
 
     <!-- ✏️ 练习情况（v1.8.0） -->
@@ -222,3 +289,45 @@ function formatDuration(seconds) {
     </div>
   </div>
 </template>
+
+<style scoped>
+/* 可点击统计卡：触摸屏友好 */
+.stat-card {
+  display: block;
+  background: white;
+  border-radius: 0.75rem;
+  border: 1px solid #e2e8f0;
+  padding: 1rem 1.25rem;
+  box-shadow: 0 1px 2px rgb(0 0 0 / 0.05);
+  cursor: pointer;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent; /* 去掉 pad 上的蓝色点按高亮 */
+  touch-action: manipulation; /* 消除移动端 300ms 点击延迟 */
+  transition: transform 0.12s ease, box-shadow 0.15s ease, border-color 0.15s ease;
+}
+.stat-card:hover {
+  border-color: #c7d2fe;
+  box-shadow: 0 4px 12px rgb(0 0 0 / 0.08);
+}
+.stat-card:active {
+  transform: scale(0.97); /* 手指按下的即时反馈 */
+}
+.stat-card:focus-visible {
+  outline: 2px solid #6366f1;
+  outline-offset: 2px;
+}
+
+/* 随机诗词 / 名言横幅：触摸屏友好 */
+.quote-banner {
+  cursor: pointer;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+}
+.quote-banner p {
+  font-family: "Noto Serif SC", "Songti SC", "STSong", "SimSun", serif; /* 诗句用衬线字体更有韵味 */
+}
+.quote-mark {
+  font-family: "Noto Serif SC", "Songti SC", "STSong", "SimSun", serif;
+}
+</style>

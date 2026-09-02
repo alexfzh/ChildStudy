@@ -741,6 +741,9 @@ class ChildRewardOut(BaseModel):
     source: str
     note: Optional[str]
     earned_date: date
+    status: str = "pending"          # pending=待使用 / used=已核销
+    used_at: Optional[datetime] = None
+    used_by: Optional[int] = None
     reward: Optional[RewardOut] = None
     model_config = ConfigDict(from_attributes=True)
 

@@ -46,7 +46,11 @@ async def get_current_user(
     payload = decode_jwt(token, settings.jwt_secret)
     if not payload or "sub" not in payload:
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "登录凭证无效或已过期")
-    user = await db.get(User, int(payload["sub"]))
+    try:
+        user_id = int(payload["sub"])
+    except (TypeError, ValueError):
+        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "登录凭证无效")
+    user = await db.get(User, user_id)
     if not user or not user.is_active:
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "用户不存在或已停用")
     return user

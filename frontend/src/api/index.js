@@ -113,6 +113,15 @@ export default api;
 
 export const configAPI = {
   get: () => api.get("/config").then((r) => r.data),
+  getPublicConfig: () => api.get("/config").then((r) => r.data),
+};
+
+// 诗词名言（孩子看板欢迎栏随机展示）
+export const quoteAPI = {
+  random: (category) =>
+    api
+      .get("/quotes/random", { params: category ? { category } : {} })
+      .then((r) => r.data),
 };
 
 export const knowledgePointsAPI = {
@@ -207,6 +216,7 @@ export const rewardsAPI = {
   shop: (childId) => api.get(`/rewards/shop/${childId}`).then((r) => r.data),
   redeem: (childId, rewardId) => api.post(`/rewards/redeem/${childId}/${rewardId}`).then((r) => r.data),
   rewardHistory: (childId) => api.get(`/rewards/history/${childId}`).then((r) => r.data),
+  markRewardUsed: (recordId) => api.post(`/rewards/history/${recordId}/mark-used`).then((r) => r.data),
   listRewards: () => api.get(`/rewards/rewards`).then((r) => r.data),
   createReward: (data) => api.post(`/rewards/rewards`, data).then((r) => r.data),
   updateReward: (id, data) => api.put(`/rewards/rewards/${id}`, data).then((r) => r.data),
