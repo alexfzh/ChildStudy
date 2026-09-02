@@ -21,8 +21,14 @@ BACKEND = os.path.normpath(os.path.join(os.path.dirname(__file__), '..'))
 
 def parse_schemas():
     """返回 {class_name: 'required'|'optional'|'absent'}"""
-    with open(os.path.join(BACKEND, 'schemas.py'), 'r', encoding='utf-8') as f:
-        text = f.read()
+    schemas_dir = os.path.join(BACKEND, 'schemas')
+    texts = []
+    for fname in sorted(os.listdir(schemas_dir)):
+        if not fname.endswith('.py') or fname == '__init__.py':
+            continue
+        with open(os.path.join(schemas_dir, fname), 'r', encoding='utf-8') as f:
+            texts.append(f.read())
+    text = '\n'.join(texts)
 
     result = {}
     for m in re.finditer(r'^class (\w+)\b[\s\S]*?(?=^class |\Z)', text, re.MULTILINE):
