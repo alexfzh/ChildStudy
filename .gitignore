@@ -41,3 +41,6 @@ data/*
 .workbuddy/
 .learnings/
 .cleanup-archives/
+
+# 隐私/部署细节文档（含服务器架构、数据库路径等，公开仓库不上传）
+docs/阿里云部署手册.md
