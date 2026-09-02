@@ -48,8 +48,8 @@ async def get_current_user(
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "登录凭证无效或已过期")
     try:
         user_id = int(payload["sub"])
-    except (TypeError, ValueError):
-        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "登录凭证无效")
+    except (TypeError, ValueError) as err:
+        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "登录凭证无效") from err
     user = await db.get(User, user_id)
     if not user or not user.is_active:
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "用户不存在或已停用")

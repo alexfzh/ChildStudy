@@ -11,8 +11,8 @@ POST /api/auth/users  — 家长建子账号（家长或孩子）
 JWT 24h 过期 + 客户端清 token 足够。
 """
 import logging
-import time
 import threading
+import time
 from datetime import datetime, timezone
 from typing import Optional
 
