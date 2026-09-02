@@ -33,5 +33,9 @@ class Settings(BaseSettings):
     jwt_expire_seconds: int = 86400  # 24h
     allowed_origins: str = "*"  # 逗号分隔，CORS 白名单；家庭局域网默认全允许，生产环境可限制具体 origin
 
+    # 登录防爆破（v1.7.1）：窗口内连续失败达阈值则锁定来源 IP 一段时间
+    login_max_failures: int = 5  # 阈值：连续失败次数
+    login_lock_minutes: int = 15  # 锁定时长（分钟）
+
 
 settings = Settings()

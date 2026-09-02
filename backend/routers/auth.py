@@ -11,10 +11,12 @@ POST /api/auth/users  — 家长建子账号（家长或孩子）
 JWT 24h 过期 + 客户端清 token 足够。
 """
 import logging
+import time
+import threading
 from datetime import datetime, timezone
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -27,6 +29,68 @@ from utils.security import create_jwt, hash_password, verify_password
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/auth", tags=["认证"])
+
+# ============ 登录防爆破（v1.7.1，内存方案） ============
+# 单进程 uvicorn 内可靠；key = 来源 IP。连续失败达阈值 → 锁定 lock_seconds。
+# 线程安全用锁保护；并发极低，粗粒度足够。
+_login_lock = threading.Lock()
+_login_fail = {}  # {ip: [fail_timestamps...]}
+_login_locked = {}  # {ip: unlock_timestamp}
+_login_max_failures = max(settings.login_max_failures, 1)
+_login_lock_seconds = max(settings.login_lock_minutes * 60, 1)
+
+
+def _record_login_fail(ip: str) -> bool:
+    """记录一次失败；返回 True 表示本次失败后已触发锁定。"""
+    now = time.time()
+    with _login_lock:
+        _prune_login_state(now)
+        lst = _login_fail.setdefault(ip, [])
+        lst.append(now)
+        # 只保留最近一段窗口内的失败，避免字典无限膨胀
+        cutoff = now - max(_login_lock_seconds, 3600)
+        _login_fail[ip] = [t for t in lst if t > cutoff]
+        if len(_login_fail[ip]) >= _login_max_failures:
+            _login_locked[ip] = now + _login_lock_seconds
+            _login_fail.pop(ip, None)
+            logger.warning("登录防爆破：来源 %s 连续失败 %d 次，锁定 %d 分钟", ip, _login_max_failures, _login_lock_seconds // 60)
+            return True
+    return False
+
+
+def _is_login_locked(ip: str) -> Optional[float]:
+    """若 IP 被锁定返回还需等待秒数（约数），否则返回 None。"""
+    with _login_lock:
+        _prune_login_state(time.time())
+        unlock = _login_locked.get(ip)
+        if unlock:
+            wait = unlock - time.time()
+            if wait > 0:
+                return wait
+            _login_locked.pop(ip, None)
+    return None
+
+
+def _clear_login_fail(ip: str) -> None:
+    """登录成功后清空该 IP 的失败记录。"""
+    with _login_lock:
+        _login_fail.pop(ip, None)
+        _login_locked.pop(ip, None)
+
+
+def _prune_login_state(now: float) -> None:
+    """清掉已过期/超龄条目，防止内存泄漏。"""
+    for k in [k for k, u in _login_locked.items() if u <= now]:
+        _login_locked.pop(k, None)
+    cutoff = now - 86400
+    for k in [k for k, lst in _login_fail.items() if not lst or lst[-1] < cutoff]:
+        _login_fail.pop(k, None)
+
+
+def _client_ip(request: Request) -> str:
+    """取真实客户端 IP（无反向代理时为直连地址）。"""
+    # 若有反代可在此读取 X-Forwarded-For；当前直连场景 client.host 即真实 IP
+    return request.client.host if request.client else "unknown"
 
 
 # ============ Pydantic Schemas ============
@@ -153,11 +217,26 @@ async def setup(req: SetupRequest, db: AsyncSession = Depends(get_db)):
 
 
 @router.post("/login", response_model=TokenResponse)
-async def login(req: LoginRequest, db: AsyncSession = Depends(get_db)):
+async def login(req: LoginRequest, request: Request, db: AsyncSession = Depends(get_db)):
+    ip = _client_ip(request)
+    # 防爆破：该 IP 已被锁定 → 直接 429
+    wait = _is_login_locked(ip)
+    if wait is not None:
+        logger.warning("登录被拒（限流）：来源 %s 处于锁定期，尚需约 %ds", ip, int(wait))
+        raise HTTPException(status.HTTP_429_TOO_MANY_REQUESTS, "尝试过于频繁，请稍后再试")
+
     user = (await db.execute(select(User).where(User.username == req.username))).scalar_one_or_none()
-    if not user or not user.is_active or not verify_password(req.password, user.password_hash):
+    ok = bool(user and user.is_active and verify_password(req.password, user.password_hash))
+    if not ok:
+        triggered = _record_login_fail(ip)
+        logger.warning("登录失败：来源 %s，用户名 %r", ip, req.username)
+        if triggered:
+            raise HTTPException(status.HTTP_429_TOO_MANY_REQUESTS, "尝试过于频繁，账号已临时锁定，请稍后再试")
         # 统一返回模糊错误，避免暴露用户存在性
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "用户名或密码错误")
+
+    # 登录成功：清失败记录 + 日志留痕
+    _clear_login_fail(ip)
     user.last_login_at = datetime.now(timezone.utc)
     await db.commit()
     await db.refresh(user)
@@ -166,6 +245,7 @@ async def login(req: LoginRequest, db: AsyncSession = Depends(get_db)):
         settings.jwt_secret,
         settings.jwt_expire_seconds,
     )
+    logger.info("登录成功：来源 %s，用户 %s (id=%s, role=%s)", ip, user.username, user.id, user.role)
     return TokenResponse(
         access_token=token,
         expires_in=settings.jwt_expire_seconds,
