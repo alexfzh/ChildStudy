@@ -5,6 +5,9 @@ import { useChildStore } from "@/stores/child";
 import { useAuthStore } from "@/stores/auth";
 import { ElMessageBox } from "element-plus";
 import ChildSelector from "./ChildSelector.vue";
+import { usePWAInstall } from "@/composables/usePWAInstall";
+
+const { isInstallable, isStandalone, dismissed, platform, install, dismiss } = usePWAInstall();
 
 const route = useRoute();
 const router = useRouter();
@@ -213,6 +216,33 @@ const closeSidebar = () => {
       <!-- 内容区 -->
       <div class="flex-1 overflow-y-auto">
         <div class="max-w-7xl mx-auto px-4 md:px-6 py-6">
+          <!-- PWA 安装提示（非 standalone 模式下显示） -->
+          <div v-if="!isStandalone && !dismissed && (isInstallable || platform === 'ios' || platform === 'ipad')" class="mb-5">
+            <div class="card p-4 bg-gradient-to-r from-brand-50 to-indigo-50 border-brand-200 flex items-start gap-3">
+              <span class="text-2xl flex-shrink-0">📲</span>
+              <div class="flex-1 min-w-0">
+                <div class="text-sm font-semibold text-slate-800">添加到主屏幕，像 App 一样使用</div>
+                <div class="text-xs text-slate-500 mt-1">
+                  <template v-if="platform === 'ios' || platform === 'ipad'">
+                    iOS 用户：点击浏览器底部 <span class="font-medium">分享</span> 按钮 → <span class="font-medium">添加到主屏幕</span>
+                  </template>
+                  <template v-else>
+                    点击下方按钮安装到主屏幕，离线也能用
+                  </template>
+                </div>
+                <div class="flex gap-2 mt-2">
+                  <template v-if="isInstallable">
+                    <button class="btn-primary text-xs !py-1.5 !px-3" @click="install">
+                      立即安装
+                    </button>
+                  </template>
+                  <button class="btn-ghost text-xs !py-1.5 !px-3" @click="dismiss">
+                    暂不
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
           <slot />
         </div>
       </div>

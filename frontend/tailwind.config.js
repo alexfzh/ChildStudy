@@ -18,7 +18,7 @@ export default {
         },
       },
       fontFamily: {
-        sans: ["Inter", "PingFang SC", "Microsoft YaHei", "system-ui", "sans-serif"],
+        sans: ["Noto Sans CJK SC", "PingFang SC", "Microsoft YaHei", "Inter", "system-ui", "sans-serif"],
       },
       boxShadow: {
         card: "0 1px 3px 0 rgba(0,0,0,0.05), 0 1px 2px -1px rgba(0,0,0,0.04)",
