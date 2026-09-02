@@ -734,3 +734,14 @@ class Quote(Base):
     source: Mapped[Optional[str]] = mapped_column(String(128), nullable=True)  # 出处，如《竹石》
     category: Mapped[str] = mapped_column(String(16), default="poem", index=True)  # 'poem' | 'quote'
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now(timezone.utc))
+
+
+class LoginLock(Base):
+    """登录防爆破状态（替代内存 dict，支持多 worker 部署）"""
+    __tablename__ = "login_locks"
+
+    ip: Mapped[str] = mapped_column(String(64), primary_key=True)  # 来源 IP
+    locked_until: Mapped[Optional[float]] = mapped_column(Float, nullable=True, index=True)  # 解锁时间戳
+    fail_count: Mapped[int] = mapped_column(Integer, default=0)  # 连续失败次数
+    first_fail_at: Mapped[Optional[float]] = mapped_column(Float, nullable=True)  # 窗口内首次失败时间戳
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now(timezone.utc), onupdate=datetime.now(timezone.utc))

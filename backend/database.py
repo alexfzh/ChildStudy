@@ -1,5 +1,6 @@
 """数据库初始化与会话管理"""
 import logging
+import re
 
 from sqlalchemy import event
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
@@ -80,6 +81,13 @@ async def _migrate_data_quality(conn) -> None:
 
     async def _dedupe(table: str, group_cols: str) -> int:
         """按 group_cols 分组去重，每组保留 id 最小的一行，返回被删行数。"""
+        # 表名白名单（防止 SQL 注入）
+        _ALLOWED_DEDUPE_TABLES = {"child_ranks", "child_achievements"}
+        if table not in _ALLOWED_DEDUPE_TABLES:
+            raise ValueError(f"不允许的去重表名：{table}")
+        # group_cols 只允许列名、逗号、括号和 COALESCE 函数
+        if not re.match(r'^[a-zA-Z_][a-zA-Z0-9_]*(\s*,\s*[a-zA-Z_][a-zA-Z0-9_]*)*(\s*,\s*COALESCE\([^)]+\))?$', group_cols):
+            raise ValueError(f"不允许的 group_cols：{group_cols}")
         before = (await conn.execute(text(f"SELECT COUNT(*) FROM {table}"))).scalar_one()
         await conn.execute(text(
             f"DELETE FROM {table} WHERE id NOT IN "
