@@ -68,7 +68,7 @@ const navGroups = [
   {
     label: "系统",
     items: [
-      { name: "settings", path: "/settings", label: "系统设置", icon: "⚙️", roles: ["parent"] },
+      { name: "settings", path: "/settings", label: "系统设置", icon: "⚙️", roles: ["parent", "child"] },
       { name: "about", path: "/about", label: "关于系统", icon: "ℹ️", roles: ["parent", "child"] },
     ],
   },
