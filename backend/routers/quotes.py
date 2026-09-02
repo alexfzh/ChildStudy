@@ -1,6 +1,6 @@
 """诗词 / 名言随机接口（孩子看板欢迎栏）"""
 from fastapi import APIRouter, Depends, Query
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -18,8 +18,7 @@ class QuoteOut(BaseModel):
     source: str | None = None
     category: str
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 @router.get("/random", response_model=QuoteOut)
