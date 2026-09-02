@@ -1,4 +1,4 @@
-"""认证路由测试（v1.7.1）：登录 / 改密 / 防爆破 / JWT / 范围过滤
+"""认证路由测试（v1.7.2 审计加固）：登录 / 改密 / 防爆破 / JWT / 范围过滤
 
 覆盖关键安全路径：
 - 登录成功 + 失败 + 用户不存在
@@ -9,10 +9,8 @@
 - 多孩子 scope 隔离
 """
 import time
-from datetime import datetime, timezone
 
 import pytest
-import pytest_asyncio
 from fastapi import HTTPException
 from sqlalchemy import select
 
@@ -26,7 +24,6 @@ from routers.auth import (
     _record_login_fail,
 )
 from utils.security import create_jwt, hash_password, verify_password
-
 
 # ============== 工具 ==============
 
@@ -85,6 +82,7 @@ async def test_login_success(db_session):
 async def test_login_wrong_password(db_session):
     """密码错误 → 401 + 模糊错误（不暴露用户是否存在）"""
     from fastapi import HTTPException
+
     from routers.auth import LoginRequest, login
     fam = await _make_family_with(db_session)
     await _make_user(db_session, fam.id, "alice", "correct_pw")
@@ -101,6 +99,7 @@ async def test_login_wrong_password(db_session):
 async def test_login_nonexistent_user(db_session):
     """不存在的用户 → 同样模糊错误（不区分 vs 错误密码）"""
     from fastapi import HTTPException
+
     from routers.auth import LoginRequest, login
 
     class _FakeReq:
@@ -114,6 +113,7 @@ async def test_login_nonexistent_user(db_session):
 async def test_login_inactive_user_rejected(db_session):
     """is_active=False 的账号 → 401（即使密码对）"""
     from fastapi import HTTPException
+
     from routers.auth import LoginRequest, login
     fam = await _make_family_with(db_session)
     user = await _make_user(db_session, fam.id, "alice", "secret")
@@ -133,6 +133,7 @@ async def test_login_inactive_user_rejected(db_session):
 async def test_login_lockout_after_max_failures(db_session):
     """连续 login_max_failures 次失败 → 第 N+1 次请求 429"""
     from fastapi import HTTPException
+
     from routers.auth import LoginRequest, login
     # 清掉其它测试残留
     _login_fail.clear()
@@ -223,6 +224,7 @@ async def test_change_password_success(db_session):
 async def test_change_password_wrong_old(db_session):
     """改密：原密码错 → 401，hash 不变"""
     from fastapi import HTTPException
+
     from routers.auth import ChangePasswordRequest, change_password
     fam = await _make_family_with(db_session)
     user = await _make_user(db_session, fam.id, "alice", "old_pass")
@@ -344,7 +346,7 @@ async def test_require_parent_allowed(db_session):
 @pytest.mark.asyncio
 async def test_setup_creates_default_family_and_user(db_session):
     """首次启动：无 user 时建家庭 + 家长 → 立即签 token"""
-    from routers.auth import SetupRequest, setup, setup_status
+    from routers.auth import SetupRequest, setup
 
     # 初始：默认家庭已由 conftest 引擎创建（_make_family_with 不需要再调）
     # 但要确保 families 表里至少有一条
@@ -414,11 +416,12 @@ async def test_get_accessible_child_ids_child_sees_only_self(db_session):
 async def test_assert_child_access_blocks_other(db_session):
     """assert_child_access 校验：不是自己/本家庭的 → 403"""
     from fastapi import HTTPException
+
     from dependencies import assert_child_access
     fam = await _make_family_with(db_session)
     c1 = await _make_child(db_session, fam.id, "娃1")
     c2 = await _make_child(db_session, fam.id, "娃2")
-    p = await _make_user(db_session, fam.id, "p", role="parent")
+    await _make_user(db_session, fam.id, "p", role="parent")
 
     # 家长只能访问本家庭
     accessible = {c1.id}
@@ -450,7 +453,7 @@ async def test_me_endpoint_child_only_sees_self(db_session):
     from routers.auth import me
     fam = await _make_family_with(db_session)
     c1 = await _make_child(db_session, fam.id)
-    c2 = await _make_child(db_session, fam.id)
+    await _make_child(db_session, fam.id)
     kid = await _make_user(db_session, fam.id, "kid", role="child", child_id=c1.id)
 
     resp = await me(kid, db_session)
@@ -512,7 +515,7 @@ def test_record_login_fail_triggers_lock_after_threshold():
     _login_fail.clear()
     _login_locked.clear()
     ip = "9.9.9.9"
-    for i in range(settings.login_max_failures - 1):
+    for _i in range(settings.login_max_failures - 1):
         assert _record_login_fail(ip) is False
     # 第 N 次触发
     assert _record_login_fail(ip) is True

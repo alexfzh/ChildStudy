@@ -31,7 +31,7 @@ class UpgradeLog(BaseModel):
 
 
 # 当前版本（手动 bump，对应前端 package.json version）
-CURRENT_VERSION = "1.7.1"
+CURRENT_VERSION = "1.7.2"
 BUILD_TIME = "2026-09-02"
 
 # 全量升级历史存在 data/upgrade_log.json（不提交 git，部署端自动积累）
@@ -87,6 +87,13 @@ _SEED_LOG = [
         "to_version": "1.7.1",
         "status": "success",
         "detail": "安全加固: 登录防爆破限流(来源IP连续失败N次临时锁定返回429, 默认5次/15分钟, .env 可配 LOGIN_MAX_FAILURES/LOGIN_LOCK_MINUTES) + 登录成功/失败/锁定日志留痕(含来源IP). 面向公网无 HTTPS 部署的安全增强(v1.7.1).",
+    },
+    {
+        "timestamp": "2026-09-02T21:00:00",
+        "from_version": "1.7.1",
+        "to_version": "1.7.2",
+        "status": "success",
+        "detail": "hotfix + 审计加固: dependencies.py B904 修复 (raise ... from err) + auth.py/rewards.py import sort + test_auth.py 新增 29 个用例 (登录/防爆破/改密/JWT/角色守卫/范围隔离/setup/安全工具) 覆盖 v1.7.0-v1.7.1 安全关键路径 + frontend audit:routes 脚本 (路由 meta 校验) + README 新增部署安全须知章节 (单 worker / JWT secret rotation / CORS 不要 credentials / 端口暴露策略) + ruff check 全过 (v1.7.2).",
     },
 ]
 
