@@ -2,6 +2,7 @@
 
 聚合所有静态检查 + 测试：
 - 后端 ruff check
+- 后端 audit:schema-router（schema vs router 冲突检测，防 422 类 bug）
 - 后端 pytest（核心套件，跳过慢测试）
 - 前端 audit:routes（路由 meta 校验）
 
@@ -51,6 +52,12 @@ if not args.frontend_only:
               '-m', 'ruff', 'check', '.'],
              cwd=BACKEND, timeout=60)
     results.append(('ruff', rc))
+
+    # 后端 audit:schema-router（防 422 类 bug）
+    rc = run('backend:audit-schema-router',
+             ['python', os.path.join(BACKEND, 'scripts', 'audit-schema-router.py')],
+             cwd=BACKEND, timeout=30)
+    results.append(('audit:schema-router', rc))
 
     # 后端 pytest
     if not args.skip_tests:
