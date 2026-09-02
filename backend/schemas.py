@@ -596,7 +596,8 @@ class TodayReviewResponse(BaseModel):
 
 # ============ 生长发育 ============
 class GrowthRecordBase(BaseModel):
-    child_id: int
+    # child_id 由 router 从路径参数注入，不要求 body 传（前端表单无此字段）
+    child_id: Optional[int] = None
     record_date: date
     height_cm: Optional[float] = None
     weight_kg: Optional[float] = None
@@ -628,7 +629,8 @@ class GrowthRecordOut(GrowthRecordBase):
 
 # ============ 社交情感 ============
 class SocialEmotionalBase(BaseModel):
-    child_id: int
+    # child_id 由 router 从路径参数注入，不要求 body 传
+    child_id: Optional[int] = None
     record_date: date
     mood_score: Optional[int] = Field(None, ge=1, le=5, description="情绪指数 1-5")
     emotion_tags: List[str] = Field(default_factory=list)
@@ -658,7 +660,8 @@ class SocialEmotionalOut(SocialEmotionalBase):
 
 # ============ 兴趣特长 ============
 class InterestBase(BaseModel):
-    child_id: int
+    # child_id 由 router 从路径参数注入，不要求 body 传
+    child_id: Optional[int] = None
     record_date: date
     activity_type: str = Field(..., min_length=1, max_length=32)  # 运动/音乐/美术/编程/阅读/其他
     activity_name: str = Field(..., min_length=1, max_length=128)

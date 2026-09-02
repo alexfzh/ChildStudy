@@ -31,7 +31,7 @@ class UpgradeLog(BaseModel):
 
 
 # 当前版本（手动 bump，对应前端 package.json version）
-CURRENT_VERSION = "1.7.2"
+CURRENT_VERSION = "1.7.3"
 BUILD_TIME = "2026-09-02"
 
 # 全量升级历史存在 data/upgrade_log.json（不提交 git，部署端自动积累）
@@ -94,6 +94,13 @@ _SEED_LOG = [
         "to_version": "1.7.2",
         "status": "success",
         "detail": "hotfix + 审计加固: dependencies.py B904 修复 (raise ... from err) + auth.py/rewards.py import sort + test_auth.py 新增 29 个用例 (登录/防爆破/改密/JWT/角色守卫/范围隔离/setup/安全工具) 覆盖 v1.7.0-v1.7.1 安全关键路径 + frontend audit:routes 脚本 (路由 meta 校验) + README 新增部署安全须知章节 (单 worker / JWT secret rotation / CORS 不要 credentials / 端口暴露策略) + ruff check 全过 (v1.7.2).",
+    },
+    {
+        "timestamp": "2026-09-02T21:15:00",
+        "from_version": "1.7.2",
+        "to_version": "1.7.3",
+        "status": "success",
+        "detail": "hotfix: 修复 GrowthRecord / SocialEmotional / Interest 三条 POST /:child_id 路由 422 bug — schemas.py 三个 Base schema 中 child_id 改为 Optional[int] = None (原 int 必填与 router 从路径注入冲突, 前端表单不传 child_id). 新增 test_growth_create.py 8 个测试覆盖三种 record + 兼容性 + 范围守卫. ruff + pytest 168 passed (v1.7.3).",
     },
 ]
 
