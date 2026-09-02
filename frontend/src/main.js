@@ -2,10 +2,20 @@ import { createApp } from "vue";
 import { createPinia } from "pinia";
 import ElementPlus from "element-plus";
 import zhCn from "element-plus/dist/locale/zh-cn.mjs";
+import dayjs from "dayjs";
+import utc from "dayjs/plugin/utc";
+import timezone from "dayjs/plugin/timezone";
 import "element-plus/dist/index.css";
 import App from "./App.vue";
 import router from "./router";
 import "./style.css";
+
+// 全局时区：所有 dayjs() 默认使用北京时间 (Asia/Shanghai)
+dayjs.extend(utc);
+dayjs.extend(timezone);
+dayjs.tz.setDefault("Asia/Shanghai");
+
+export default dayjs;
 
 const app = createApp(App);
 

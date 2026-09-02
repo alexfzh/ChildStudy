@@ -2,7 +2,8 @@
 import { ref, computed, onMounted } from "vue";
 import { useRouter } from "vue-router";
 import { useAuthStore } from "@/stores/auth";
-import { rewardsAPI, wrongQuestionsAPI, dashboardAPI } from "@/api";
+import { rewardsAPI, wrongQuestionsAPI, dashboardAPI, questionBanksAPI } from "@/api";
+import dayjs from "dayjs";
 import TrendLineChart from "@/components/charts/TrendLineChart.vue";
 import RadarChart from "@/components/charts/RadarChart.vue";
 
@@ -17,8 +18,22 @@ const points = ref({ earned: 0, spent: 0 });
 const achievementCount = ref(0);
 const wrongStats = ref({ total: 0, active: 0, mastered: 0 });
 const dashboard = ref(null);
+// 练习汇总（v1.8.0）
+const recentExercises = ref([]);
 
 const availablePoints = computed(() => (points.value.earned || 0) - (points.value.spent || 0));
+
+// 练习汇总：总次数 / 最近一次 / 完美率（>=80%）
+const practiceStats = computed(() => {
+  const list = (recentExercises.value || []).filter((e) => e.submitted_at);
+  const total = list.length;
+  const last = list[0];
+  const perfect = list.filter((e) => (e.score ?? 0) >= 80).length;
+  const perfectRate = total > 0 ? Math.round((perfect / total) * 100) : 0;
+  return { total, last, perfectRate };
+});
+
+const scoreColor = (s) => (s >= 80 ? "text-emerald-600" : s >= 60 ? "text-amber-600" : "text-rose-500");
 
 // 成绩曲线（家长看板 dashboardAPI.get 返回的 trend_data）
 const trendChartProps = computed(() => ({
@@ -45,16 +60,18 @@ async function load() {
   if (!childId.value) return;
   loading.value = true;
   try {
-    const [p, ach, ws, dash] = await Promise.all([
+    const [p, ach, ws, dash, exs] = await Promise.all([
       rewardsAPI.points(childId.value),
       rewardsAPI.childAchievements(childId.value),
       wrongQuestionsAPI.stats(childId.value),
       dashboardAPI.get(childId.value),
+      questionBanksAPI.listExercises(childId.value).catch(() => []),
     ]);
     points.value = p || { earned: 0, spent: 0 };
     achievementCount.value = Array.isArray(ach) ? ach.length : 0;
     wrongStats.value = ws || { total: 0, active: 0, mastered: 0 };
     dashboard.value = dash || null;
+    recentExercises.value = Array.isArray(exs) ? exs : [];
   } catch (e) {
     // 静默失败，模板已做防御渲染
   } finally {
@@ -63,6 +80,13 @@ async function load() {
 }
 
 onMounted(load);
+
+function formatDuration(seconds) {
+  const m = Math.floor(seconds / 60);
+  const s = seconds % 60;
+  if (m === 0) return `${s} 秒`;
+  return `${m} 分 ${s.toString().padStart(2, "0")} 秒`;
+}
 </script>
 
 <template>
@@ -96,6 +120,59 @@ onMounted(load);
           {{ loading ? "…" : (wrongStats.active || 0) }}
         </div>
         <div class="text-[11px] text-slate-400 mt-1">共 {{ wrongStats.total || 0 }} 道</div>
+      </div>
+    </div>
+
+    <!-- ✏️ 练习情况（v1.8.0） -->
+    <div v-if="practiceStats.total > 0" class="bg-white rounded-xl border border-slate-200 p-5 shadow-sm">
+      <div class="flex items-center justify-between mb-3 flex-wrap gap-2">
+        <h3 class="font-semibold text-slate-800 flex items-center gap-2">✏️ 我的练习</h3>
+        <router-link to="/question-banks" class="text-xs text-brand-600 hover:text-brand-700 hover:underline">去练习 →</router-link>
+      </div>
+
+      <!-- 顶部三联卡：总次数 / 最近得分 / 优秀率 -->
+      <div class="grid grid-cols-3 gap-3 mb-4">
+        <div class="bg-indigo-50 rounded-lg p-3.5">
+          <div class="text-xs text-indigo-700">总练习次数</div>
+          <div class="text-2xl font-bold text-indigo-800 mt-1">{{ practiceStats.total }}</div>
+          <div class="text-[10px] text-indigo-600 mt-1">提交记录</div>
+        </div>
+        <div class="bg-slate-50 rounded-lg p-3.5">
+          <div class="text-xs text-slate-500">最近得分</div>
+          <div class="text-2xl font-bold mt-1" :class="scoreColor(practiceStats.last?.score || 0)">
+            {{ practiceStats.last?.score?.toFixed?.(1) ?? practiceStats.last?.score ?? 0 }}
+          </div>
+          <div class="text-[10px] text-slate-400 mt-1 truncate">{{ practiceStats.last?.bank_title || '—' }}</div>
+        </div>
+        <div class="bg-emerald-50 rounded-lg p-3.5">
+          <div class="text-xs text-emerald-700">优秀率 (≥80%)</div>
+          <div class="text-2xl font-bold text-emerald-800 mt-1">{{ practiceStats.perfectRate }}%</div>
+          <div class="text-[10px] text-emerald-600 mt-1">继续保持 →</div>
+        </div>
+      </div>
+
+      <!-- 最近 5 次练习 -->
+      <div class="text-xs text-slate-500 mb-2">最近 5 次：</div>
+      <div class="space-y-2">
+        <div
+          v-for="e in recentExercises.slice(0, 5)"
+          :key="e.id"
+          class="flex items-center justify-between p-2.5 rounded-lg bg-slate-50/70 hover:bg-slate-100 transition-colors"
+        >
+          <div class="min-w-0 flex-1">
+            <div class="text-sm font-medium text-slate-700 truncate">{{ e.bank_title || `题库 #${e.bank_id}` }}</div>
+            <div class="text-xs text-slate-400 mt-0.5">
+              {{ dayjs.utc(e.submitted_at || e.created_at).tz("Asia/Shanghai").format("MM-DD HH:mm:ss") }}
+              <span class="mx-1">·</span>
+              答对 {{ e.correct_count }}/{{ e.total_questions }}
+              <span v-if="e.time_spent" class="mx-1">·</span>
+              <span v-if="e.time_spent">用时 {{ formatDuration(e.time_spent) }}</span>
+            </div>
+          </div>
+          <span class="text-base font-semibold ml-3" :class="scoreColor(e.score || 0)">
+            {{ (e.score ?? 0).toFixed(1) }}
+          </span>
+        </div>
       </div>
     </div>
 

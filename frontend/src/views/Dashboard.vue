@@ -2,7 +2,8 @@
 import { ref, computed, onMounted, watch } from "vue";
 import { useRouter } from "vue-router";
 import { useChildStore } from "@/stores/child";
-import { dashboardAPI, growthAPI, socialEmotionalAPI, interestsAPI, rewardsAPI } from "@/api";
+import api, { dashboardAPI, growthAPI, socialEmotionalAPI, interestsAPI, rewardsAPI, reportsAPI, questionBanksAPI } from "@/api";
+import { ElMessage, ElMessageBox } from "element-plus";
 import TrendLineChart from "@/components/charts/TrendLineChart.vue";
 import RadarChart from "@/components/charts/RadarChart.vue";
 import SubjectBarChart from "@/components/charts/SubjectBarChart.vue";
@@ -21,12 +22,14 @@ const interestRecords = ref([]);
 const pointsSummary = ref(null);
 const ranks = ref([]);
 const childAchievements = ref([]);
+// 练习汇总（v1.8.0）
+const recentExercises = ref([]);
 
 const fetchData = async () => {
   if (!childStore.currentId) return;
   loading.value = true;
   try {
-    const [dash, growth, social, interests, achievements, points, rankList] = await Promise.all([
+    const [dash, growth, social, interests, achievements, points, rankList, exs] = await Promise.all([
       dashboardAPI.get(childStore.currentId),
       growthAPI.list(childStore.currentId).catch(() => []),
       socialEmotionalAPI.list(childStore.currentId).catch(() => []),
@@ -34,6 +37,7 @@ const fetchData = async () => {
       rewardsAPI.childAchievements(childStore.currentId).catch(() => []),
       rewardsAPI.points(childStore.currentId).catch(() => null),
       rewardsAPI.ranks(childStore.currentId).catch(() => []),
+      questionBanksAPI.listExercises(childStore.currentId).catch(() => []),
     ]);
     dashboard.value = dash;
     growthRecords.value = growth;
@@ -42,6 +46,7 @@ const fetchData = async () => {
     childAchievements.value = achievements;
     pointsSummary.value = points;
     ranks.value = rankList;
+    recentExercises.value = Array.isArray(exs) ? exs : [];
   } finally {
     loading.value = false;
   }
@@ -129,6 +134,23 @@ const interestTypes = computed(() => {
   return Array.from(set);
 });
 
+// ============ 练习汇总（v1.8.0）===========
+const submittedExercises = computed(() =>
+  (recentExercises.value || []).filter((e) => e.submitted_at)
+);
+const practiceStats = computed(() => {
+  const list = submittedExercises.value;
+  const total = list.length;
+  const last = list[0];
+  const perfect = list.filter((e) => (e.score ?? 0) >= 80).length;
+  const perfectRate = total > 0 ? Math.round((perfect / total) * 100) : 0;
+  // 近 7 天练习次数
+  const sevenDaysAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
+  const recent7Count = list.filter((e) => new Date(e.submitted_at).getTime() >= sevenDaysAgo).length;
+  return { total, last, perfectRate, recent7Count };
+});
+const practiceScoreColor = (s) => (s >= 80 ? "text-emerald-600" : s >= 60 ? "text-amber-600" : "text-rose-500");
+
 // ============ 奖励系统摘要 ============
 // 已获得的称号（按解锁时间倒序），取最近 4 个
 const earnedAchievements = computed(() =>
@@ -149,6 +171,98 @@ const tierColor = (tier) => {
 const goAddExam = () => router.push("/exams?action=new");
 const goReports = () => router.push("/ai-reports");
 const goRewards = () => router.push("/rewards");
+
+// ============ 学情周/月报（v1.7.0）===========
+const periodReports = ref([]);
+const periodGenerating = ref(false);
+
+async function loadPeriodReports() {
+  if (!childStore.currentId) {
+    periodReports.value = [];
+    return;
+  }
+  try {
+    periodReports.value = await reportsAPI.listPeriod(childStore.currentId);
+  } catch (e) {
+    // 静默忽略（首次无数据时可能 404）
+  }
+}
+
+async function generatePeriod(type) {
+  if (!childStore.currentId) {
+    ElMessage.warning("请先选择孩子");
+    return;
+  }
+  periodGenerating.value = true;
+  try {
+    const result = await reportsAPI.generatePeriod(childStore.currentId, { period_type: type });
+    ElMessage.success(`${type === 'weekly' ? '周报' : '月报'} 生成成功！${(result.file_size / 1024).toFixed(1)} KB`);
+    await loadPeriodReports();
+    // 自动触发下载（走 axios，拦截器自动带 Bearer 头，避免 401）
+    await downloadPeriodFile(result.id);
+  } catch (e) {
+    ElMessage.error(`生成失败：${e?.response?.data?.detail || e.message}`);
+  } finally {
+    periodGenerating.value = false;
+  }
+}
+
+async function deletePeriod(report) {
+  try {
+    await ElMessageBox.confirm(
+      `确认删除「${report.period_type === 'weekly' ? '周报' : '月报'}」(${report.period_start} ~ ${report.period_end})？`,
+      "删除报告",
+      { confirmButtonText: "删除", cancelButtonText: "取消", type: "warning" }
+    );
+  } catch {
+    return; // 取消
+  }
+  try {
+    await reportsAPI.deletePeriod(report.id);
+    ElMessage.success("已删除");
+    await loadPeriodReports();
+  } catch (e) {
+    ElMessage.error(`删除失败：${e?.response?.data?.detail || e.message}`);
+  }
+}
+
+// 通过 axios 下载 PDF（拦截器自动带 Authorization: Bearer，解决 401 未提供登录凭证）
+async function downloadPeriodFile(reportId) {
+  try {
+    const resp = await api.get(`/reports/period/${reportId}/download`, { responseType: "blob" });
+    const cd = resp.headers["content-disposition"] || "";
+    const m = cd.match(/filename\*?=(?:UTF-8'')?"?([^";]+)"?/i);
+    const filename = m ? m[1] : `ChildStudy-report-${reportId}.pdf`;
+    const url = window.URL.createObjectURL(new Blob([resp.data]));
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    window.URL.revokeObjectURL(url);
+  } catch (e) {
+    const detail = e?.response?.data?.detail || e.message || "未知错误";
+    ElMessage.error(`下载失败：${detail}`);
+  }
+}
+
+function downloadPeriod(report) {
+  downloadPeriodFile(report.id);
+}
+
+function formatDuration(seconds) {
+  const m = Math.floor(seconds / 60);
+  const s = seconds % 60;
+  if (m === 0) return `${s} 秒`;
+  return `${m} 分 ${s.toString().padStart(2, "0")} 秒`;
+}
+
+watch(
+  () => childStore.currentId,
+  () => loadPeriodReports(),
+  { immediate: true }
+);
 </script>
 
 <template>
@@ -202,6 +316,62 @@ const goRewards = () => router.push("/rewards");
             </span>
             <span v-else class="text-slate-400">暂无</span>
           </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ✏️ 练习汇总（v1.8.0） -->
+    <div v-if="practiceStats.total > 0" class="card p-5">
+      <div class="flex items-center justify-between mb-3 flex-wrap gap-2">
+        <h3 class="font-semibold text-slate-800 flex items-center gap-2">✏️ 练习情况</h3>
+        <button class="btn-ghost text-xs" @click="router.push('/question-banks')">查看题库 →</button>
+      </div>
+
+      <!-- 顶部四联卡：总次数 / 近7天 / 最近得分 / 优秀率 -->
+      <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
+        <div class="bg-indigo-50 rounded-xl p-3.5">
+          <div class="text-xs text-indigo-700">总练习次数</div>
+          <div class="text-2xl font-semibold text-indigo-800 mt-1">{{ practiceStats.total }}</div>
+        </div>
+        <div class="bg-slate-50 rounded-xl p-3.5">
+          <div class="text-xs text-slate-500">近 7 天</div>
+          <div class="text-2xl font-semibold text-slate-800 mt-1">{{ practiceStats.recent7Count }}</div>
+          <div class="text-[10px] text-slate-400 mt-0.5">练习次数</div>
+        </div>
+        <div class="bg-slate-50 rounded-xl p-3.5">
+          <div class="text-xs text-slate-500">最近得分</div>
+          <div class="text-2xl font-semibold mt-1" :class="practiceScoreColor(practiceStats.last?.score || 0)">
+            {{ practiceStats.last?.score?.toFixed?.(1) ?? practiceStats.last?.score ?? 0 }}
+          </div>
+          <div class="text-[10px] text-slate-400 mt-0.5 truncate">{{ practiceStats.last?.bank_title || '—' }}</div>
+        </div>
+        <div class="bg-emerald-50 rounded-xl p-3.5">
+          <div class="text-xs text-emerald-700">优秀率 (≥80%)</div>
+          <div class="text-2xl font-semibold text-emerald-800 mt-1">{{ practiceStats.perfectRate }}%</div>
+        </div>
+      </div>
+
+      <!-- 最近 5 次列表 -->
+      <div class="text-xs text-slate-500 mb-2">最近 5 次：</div>
+      <div class="space-y-2">
+        <div
+          v-for="e in submittedExercises.slice(0, 5)"
+          :key="e.id"
+          class="flex items-center justify-between p-2.5 rounded-lg bg-slate-50/60 hover:bg-slate-50 transition-colors"
+        >
+          <div class="min-w-0 flex-1">
+            <div class="text-sm font-medium text-slate-700 truncate">{{ e.bank_title || `题库 #${e.bank_id}` }}</div>
+            <div class="text-xs text-slate-400 mt-0.5">
+              {{ dayjs.utc(e.submitted_at).tz("Asia/Shanghai").format("MM-DD HH:mm:ss") }}
+              <span class="mx-1">·</span>
+              答对 {{ e.correct_count }}/{{ e.total_questions }}
+              <span v-if="e.time_spent" class="mx-1">·</span>
+              <span v-if="e.time_spent">用时 {{ formatDuration(e.time_spent) }}</span>
+            </div>
+          </div>
+          <span class="text-base font-semibold ml-3" :class="practiceScoreColor(e.score || 0)">
+            {{ (e.score ?? 0).toFixed(1) }}
+          </span>
         </div>
       </div>
     </div>
@@ -278,7 +448,7 @@ const goRewards = () => router.push("/rewards");
           >
             <div class="min-w-0">
               <div class="text-sm font-medium text-slate-700 truncate">{{ e.exam_name }}</div>
-              <div class="text-xs text-slate-400 mt-0.5">{{ e.subject }} · {{ dayjs(e.exam_date).format("MM-DD") }}</div>
+              <div class="text-xs text-slate-400 mt-0.5">{{ e.subject }} · {{ dayjs.utc(e.exam_date).tz("Asia/Shanghai").format("MM-DD") }}</div>
             </div>
             <div class="flex items-center gap-2 flex-shrink-0">
               <span class="text-sm font-semibold text-slate-800">
@@ -311,6 +481,81 @@ const goRewards = () => router.push("/rewards");
         <button class="bg-white text-brand-700 hover:bg-brand-50 btn" @click="goReports">
           管理 AI 报告 →
         </button>
+      </div>
+    </div>
+
+    <!-- 📑 学情周报/月报（v1.7.0） -->
+    <div class="card p-5">
+      <div class="flex items-center justify-between mb-3 flex-wrap gap-2">
+        <div>
+          <h3 class="font-semibold text-slate-800 flex items-center gap-2">📑 学情周报/月报</h3>
+          <p class="text-xs text-slate-500 mt-0.5">系统自动聚合考试/错题/KP/段位/积分，导出 PDF（中文渲染·本地生成·隐私零泄露）</p>
+        </div>
+        <div class="flex items-center gap-2">
+          <button
+            class="btn-secondary text-sm"
+            :disabled="periodGenerating || !childStore.currentId"
+            @click="generatePeriod('weekly')"
+          >
+            <span v-if="periodGenerating">生成中…</span>
+            <span v-else>📅 生成本周周报</span>
+          </button>
+          <button
+            class="btn-primary text-sm"
+            :disabled="periodGenerating || !childStore.currentId"
+            @click="generatePeriod('monthly')"
+          >
+            <span v-if="periodGenerating">生成中…</span>
+            <span v-else>🗓 生成本月月报</span>
+          </button>
+        </div>
+      </div>
+
+      <div v-if="!childStore.currentId" class="text-sm text-slate-400 py-6 text-center">
+        请先选择孩子
+      </div>
+      <div v-else-if="periodReports.length === 0" class="text-sm text-slate-400 py-6 text-center">
+        还没有生成过报告，点上方按钮一键生成
+      </div>
+      <div v-else class="overflow-x-auto">
+        <table class="w-full text-sm">
+          <thead>
+            <tr class="text-left text-slate-500 border-b border-slate-200">
+              <th class="py-2 pr-3">类型</th>
+              <th class="py-2 pr-3">周期</th>
+              <th class="py-2 pr-3">生成时间</th>
+              <th class="py-2 pr-3">大小</th>
+              <th class="py-2 pr-3 text-right">操作</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr
+              v-for="r in periodReports"
+              :key="r.id"
+              class="border-b border-slate-100 hover:bg-slate-50"
+            >
+              <td class="py-2.5 pr-3">
+                <span
+                  class="px-2 py-0.5 rounded-full text-xs font-medium"
+                  :class="r.period_type === 'weekly' ? 'bg-indigo-50 text-indigo-700' : 'bg-amber-50 text-amber-700'"
+                >
+                  {{ r.period_type === 'weekly' ? '周报' : '月报' }}
+                </span>
+              </td>
+              <td class="py-2.5 pr-3 text-slate-600">{{ r.period_start }} ~ {{ r.period_end }}</td>
+              <td class="py-2.5 pr-3 text-slate-600">{{ dayjs.utc(r.created_at).tz("Asia/Shanghai").format("MM-DD HH:mm") }}</td>
+              <td class="py-2.5 pr-3 text-slate-600">{{ (r.file_size / 1024).toFixed(1) }} KB</td>
+              <td class="py-2.5 pr-3 text-right">
+                <button class="text-indigo-600 hover:text-indigo-800 text-xs mr-3" @click="downloadPeriod(r)">
+                  ⬇️ 下载
+                </button>
+                <button class="text-rose-500 hover:text-rose-700 text-xs" @click="deletePeriod(r)">
+                  🗑 删除
+                </button>
+              </td>
+            </tr>
+          </tbody>
+        </table>
       </div>
     </div>
 
