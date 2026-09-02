@@ -1,10 +1,10 @@
 """兴趣特长"""
 
 from datetime import date, datetime
-from enum import Enum
-from typing import List, Literal, Optional
+from typing import Optional
 
 from pydantic import BaseModel, ConfigDict, Field
+
 
 # ============ 兴趣特长 ============
 class InterestBase(BaseModel):

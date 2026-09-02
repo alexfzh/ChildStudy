@@ -1,10 +1,10 @@
 """AI 报告（手动导入）"""
 
 from datetime import date, datetime
-from enum import Enum
-from typing import List, Literal, Optional
+from typing import Optional
 
 from pydantic import BaseModel, ConfigDict, Field
+
 
 # ============ AI 报告（手动导入） ============
 class AIReportCreate(BaseModel):

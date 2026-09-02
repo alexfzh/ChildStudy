@@ -1,10 +1,10 @@
 """错题本"""
 
 from datetime import date, datetime
-from enum import Enum
 from typing import List, Literal, Optional
 
 from pydantic import BaseModel, ConfigDict, Field
+
 
 # ============ 错题本 ============
 class WrongQuestionBase(BaseModel):

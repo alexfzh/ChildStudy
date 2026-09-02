@@ -1,10 +1,10 @@
 """奖励系统"""
 
 from datetime import date, datetime
-from enum import Enum
-from typing import List, Literal, Optional
+from typing import List, Optional
 
 from pydantic import BaseModel, ConfigDict, Field
+
 
 # ============ 奖励系统 ============
 class RankInfo(BaseModel):

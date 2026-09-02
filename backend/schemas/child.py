@@ -1,10 +1,10 @@
 """孩子档案 / 年级历史"""
 
 from datetime import date, datetime
-from enum import Enum
-from typing import List, Literal, Optional
+from typing import List, Optional
 
 from pydantic import BaseModel, ConfigDict, Field
+
 
 # ============ 孩子档案 ============
 class ChildBase(BaseModel):

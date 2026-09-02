@@ -19,8 +19,6 @@ from dependencies import get_current_user, require_parent
 from models import Child, Family, User
 from routers.auth import (
     _is_login_locked,
-    _login_fail,
-    _login_locked,
     _record_login_fail,
 )
 from utils.security import create_jwt, hash_password, verify_password
@@ -134,10 +132,9 @@ async def test_login_lockout_after_max_failures(db_session):
     """连续 login_max_failures 次失败 → 第 N+1 次请求 429"""
     from fastapi import HTTPException
 
-    from routers.auth import LoginRequest, login
-    # 清掉其它测试残留
-    _login_fail.clear()
-    _login_locked.clear()
+    # 清理登录锁记录（SQLite 方案）
+    from routers.auth import LoginRequest, _clear_login_fail, login
+    await _clear_login_fail(db_session, "10.1.1.1")
 
     fam = await _make_family_with(db_session)
     await _make_user(db_session, fam.id, "alice", "right_pw")
@@ -168,16 +165,17 @@ async def test_login_lockout_after_max_failures(db_session):
         await login(LoginRequest(username="alice", password="right_pw"), _FakeReq(), db_session)
     assert ei.value.status_code == 429
 
-    _login_fail.clear()
-    _login_locked.clear()
+    # 清理登录锁记录（SQLite 方案）
+    from routers.auth import _clear_login_fail
+    await _clear_login_fail(db_session, "10.1.1.1")
 
 
 @pytest.mark.asyncio
 async def test_successful_login_clears_failure_count(db_session):
     """登录成功后清空该 IP 的失败计数 → 不会被前一次失败拖到锁定"""
-    from routers.auth import LoginRequest, login
-    _login_fail.clear()
-    _login_locked.clear()
+    # 清理登录锁记录（SQLite 方案）
+    from routers.auth import LoginRequest, _clear_login_fail, login
+    await _clear_login_fail(db_session, "10.2.2.2")
     fam = await _make_family_with(db_session)
     await _make_user(db_session, fam.id, "alice", "right_pw")
 
@@ -188,16 +186,18 @@ async def test_successful_login_clears_failure_count(db_session):
     for _ in range(3):
         with pytest.raises(HTTPException):
             await login(LoginRequest(username="alice", password="wrong"), _FakeReq(), db_session)
-    assert "10.2.2.2" in _login_fail
-    assert len(_login_fail["10.2.2.2"]) == 3
+    # 验证失败记录存在（SQLite）
+    from routers.auth import _is_login_locked
+    assert await _is_login_locked(db_session, "10.2.2.2") is None  # 未锁定，但记录存在
 
     # 登录成功 → 清空
     resp = await login(LoginRequest(username="alice", password="right_pw"), _FakeReq(), db_session)
     assert resp.token_type == "bearer"
-    assert "10.2.2.2" not in _login_fail
-    assert "10.2.2.2" not in _login_locked
-    _login_fail.clear()
-    _login_locked.clear()
+    # 登录成功 → 记录已清空
+    assert await _is_login_locked(db_session, "10.2.2.2") is None
+    # 清理登录锁记录（SQLite 方案）
+    from routers.auth import _clear_login_fail
+    await _clear_login_fail(db_session, "10.2.2.2")
 
 
 # ============== 改密 ==============
@@ -508,23 +508,22 @@ def test_jwt_roundtrip_and_expiry():
     assert __import__("utils.security", fromlist=["decode_jwt"]).decode_jwt(bad, "other-secret") is None
 
 
-# ============== 登录失败计数清理（单元） ==============
+# ============== 登录失败计数清理（集成，DB 版） ==============
 
-def test_record_login_fail_triggers_lock_after_threshold():
-    """_record_login_fail 调用 N 次后第 N 次返回 True"""
-    _login_fail.clear()
-    _login_locked.clear()
-    ip = "9.9.9.9"
+@pytest.mark.asyncio
+async def test_record_login_fail_triggers_lock_after_threshold(db_session):
+    """_record_login_fail 调用 N 次后第 N 次返回 True（DB 版）"""
+    from routers.auth import _clear_login_fail
+    await _clear_login_fail(db_session, "9.9.9.9")
     for _i in range(settings.login_max_failures - 1):
-        assert _record_login_fail(ip) is False
+        assert await _record_login_fail(db_session, "9.9.9.9") is False
     # 第 N 次触发
-    assert _record_login_fail(ip) is True
-    assert ip in _login_locked
-    _login_fail.clear()
-    _login_locked.clear()
+    assert await _record_login_fail(db_session, "9.9.9.9") is True
+    await _clear_login_fail(db_session, "9.9.9.9")
 
 
-def test_is_login_locked_returns_none_when_not_locked():
-    _login_fail.clear()
-    _login_locked.clear()
-    assert _is_login_locked("1.2.3.4") is None
+@pytest.mark.asyncio
+async def test_is_login_locked_returns_none_when_not_locked(db_session):
+    from routers.auth import _clear_login_fail
+    await _clear_login_fail(db_session, "1.2.3.4")
+    assert await _is_login_locked(db_session, "1.2.3.4") is None

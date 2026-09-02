@@ -1,10 +1,10 @@
 """KPStudyProgress"""
 
-from datetime import date, datetime
-from enum import Enum
-from typing import List, Literal, Optional
+from datetime import datetime
+from typing import Optional
 
 from pydantic import BaseModel, ConfigDict, Field
+
 
 # ============ KPStudyProgress（KP 级别掌握度） ============
 class KPStudyProgressOut(BaseModel):

@@ -1,12 +1,11 @@
 """Dashboard 聚合数据"""
 
-from datetime import date, datetime
-from enum import Enum
-from typing import List, Literal, Optional
+from typing import List
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel
 
-from schemas.exam import ExamOut  # noqa: F401
+from schemas.exam import ExamOut
+
 
 # ============ Dashboard ============
 class SubjectStat(BaseModel):

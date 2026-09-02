@@ -1,12 +1,13 @@
 """题库 + 练习"""
 
-from datetime import date, datetime
-from enum import Enum
-from typing import List, Literal, Optional
+from datetime import datetime
+from typing import List, Optional
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from schemas.wrong_question import KPMatchCandidateOut, MatchedQuestionOut  # noqa: F401
+from schemas.rewards import ChildAchievementOut
+from schemas.wrong_question import KPMatchCandidateOut, MatchedQuestionOut
+
 
 # ============ 题库系统 ============
 class QuestionBankBase(BaseModel):

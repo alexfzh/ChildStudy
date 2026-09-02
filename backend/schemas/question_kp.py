@@ -1,10 +1,8 @@
 """Question ↔ KnowledgePoint 多对多关联"""
 
-from datetime import date, datetime
-from enum import Enum
-from typing import List, Literal, Optional
 
 from pydantic import BaseModel, ConfigDict, Field
+
 
 # ============ Question ↔ KnowledgePoint 多对多关联 ============
 class QuestionKPLink(BaseModel):

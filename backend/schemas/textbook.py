@@ -1,10 +1,10 @@
 """教材版本 / 单元 / 学习进度 / Project 作品"""
 
-from datetime import date, datetime
-from enum import Enum
-from typing import List, Literal, Optional
+from datetime import datetime
+from typing import Optional
 
 from pydantic import BaseModel, ConfigDict, Field
+
 
 # ============ 教材版本 / 单元 / 学习进度 / Project 作品 ============
 class TextbookVersionBase(BaseModel):

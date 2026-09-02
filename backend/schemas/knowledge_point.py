@@ -1,10 +1,10 @@
 """知识点标签库"""
 
-from datetime import date, datetime
-from enum import Enum
-from typing import List, Literal, Optional
+from datetime import datetime
+from typing import Optional
 
 from pydantic import BaseModel, ConfigDict, Field
+
 
 # ============ 知识点标签库 ============
 class KnowledgePointBase(BaseModel):

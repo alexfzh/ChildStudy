@@ -1,12 +1,10 @@
 """KnowledgePoint ↔ Unit 多对多关联"""
 
-from datetime import date, datetime
-from enum import Enum
-from typing import List, Literal, Optional
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from schemas.knowledge_point import KnowledgePointBase  # noqa: F401
+from schemas.knowledge_point import KnowledgePointBase
+
 
 # ============ KnowledgePoint ↔ Unit 多对多关联 ============
 class KnowledgePointUnitLink(BaseModel):

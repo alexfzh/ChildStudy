@@ -1,10 +1,8 @@
 """通用响应 / 状态"""
 
-from datetime import date, datetime
-from enum import Enum
-from typing import List, Literal, Optional
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel
+
 
 # ============ 通用 ============
 class OkResponse(BaseModel):

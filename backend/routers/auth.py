@@ -11,7 +11,6 @@ POST /api/auth/users  — 家长建子账号（家长或孩子）
 JWT 24h 过期 + 客户端清 token 足够。
 """
 import logging
-import threading
 import time
 from datetime import datetime, timezone
 from typing import Optional
@@ -24,69 +23,87 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from config import settings
 from database import get_db
 from dependencies import get_current_user, require_parent
-from models import Child, Family, User
+from models import Child, Family, LoginLock, User
 from utils.security import create_jwt, hash_password, verify_password
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/auth", tags=["认证"])
 
-# ============ 登录防爆破（v1.7.1，内存方案） ============
-# 单进程 uvicorn 内可靠；key = 来源 IP。连续失败达阈值 → 锁定 lock_seconds。
-# 线程安全用锁保护；并发极低，粗粒度足够。
-_login_lock = threading.Lock()
-_login_fail = {}  # {ip: [fail_timestamps...]}
-_login_locked = {}  # {ip: unlock_timestamp}
+# ============ 登录防爆破（v1.7.1，SQLite 方案，支持多 worker） ============
+# 状态存入 login_locks 表，替代内存 dict。
 _login_max_failures = max(settings.login_max_failures, 1)
 _login_lock_seconds = max(settings.login_lock_minutes * 60, 1)
+_login_window_seconds = max(_login_lock_seconds, 3600)  # 失败记录保留窗口
 
 
-def _record_login_fail(ip: str) -> bool:
+async def _prune_login_state(db: AsyncSession, now: float) -> None:
+    """清理过期的登录锁记录（过期解锁 + 窗口外失败）"""
+    from sqlalchemy import delete
+    # 删除已解锁且超出窗口的记录
+    await db.execute(
+        delete(LoginLock)
+        .where(
+            (LoginLock.locked_until.is_(None) & (LoginLock.first_fail_at < now - _login_window_seconds))
+            | (LoginLock.locked_until.isnot(None) & (LoginLock.locked_until < now))
+        )
+    )
+    await db.commit()
+
+
+async def _record_login_fail(db: AsyncSession, ip: str) -> bool:
     """记录一次失败；返回 True 表示本次失败后已触发锁定。"""
+    from datetime import datetime, timezone
+
+    from sqlalchemy import select as sa_select
     now = time.time()
-    with _login_lock:
-        _prune_login_state(now)
-        lst = _login_fail.setdefault(ip, [])
-        lst.append(now)
-        # 只保留最近一段窗口内的失败，避免字典无限膨胀
-        cutoff = now - max(_login_lock_seconds, 3600)
-        _login_fail[ip] = [t for t in lst if t > cutoff]
-        if len(_login_fail[ip]) >= _login_max_failures:
-            _login_locked[ip] = now + _login_lock_seconds
-            _login_fail.pop(ip, None)
-            logger.warning("登录防爆破：来源 %s 连续失败 %d 次，锁定 %d 分钟", ip, _login_max_failures, _login_lock_seconds // 60)
-            return True
+    await _prune_login_state(db, now)
+    lock = (await db.execute(sa_select(LoginLock).where(LoginLock.ip == ip))).scalar_one_or_none()
+    if lock is None:
+        lock = LoginLock(ip=ip, fail_count=1, first_fail_at=now, locked_until=None)
+        db.add(lock)
+        await db.commit()
+        return False
+    # 检查是否已锁定
+    if lock.locked_until and now < lock.locked_until:
+        return False  # 仍在锁定中，不增加计数
+    # 如果窗口已过，重置
+    if lock.first_fail_at and now - lock.first_fail_at > _login_window_seconds:
+        lock.fail_count = 0
+        lock.first_fail_at = now
+    lock.fail_count += 1
+    lock.first_fail_at = lock.first_fail_at or now
+    lock.updated_at = datetime.now(timezone.utc)
+    if lock.fail_count >= _login_max_failures:
+        lock.locked_until = now + _login_lock_seconds
+        lock.fail_count = 0
+        await db.commit()
+        logger.warning(
+            "登录防爆破：来源 %s 连续失败 %d 次，锁定 %d 分钟",
+            ip, _login_max_failures, _login_lock_seconds // 60,
+        )
+        return True
+    await db.commit()
     return False
 
 
-def _is_login_locked(ip: str) -> Optional[float]:
+async def _is_login_locked(db: AsyncSession, ip: str) -> Optional[float]:
     """若 IP 被锁定返回还需等待秒数（约数），否则返回 None。"""
-    with _login_lock:
-        _prune_login_state(time.time())
-        unlock = _login_locked.get(ip)
-        if unlock:
-            wait = unlock - time.time()
-            if wait > 0:
-                return wait
-            _login_locked.pop(ip, None)
+    from sqlalchemy import select as sa_select
+    now = time.time()
+    await _prune_login_state(db, now)
+    lock = (await db.execute(sa_select(LoginLock).where(LoginLock.ip == ip))).scalar_one_or_none()
+    if lock and lock.locked_until:
+        wait = lock.locked_until - now
+        if wait > 0:
+            return wait
     return None
 
 
-def _clear_login_fail(ip: str) -> None:
+async def _clear_login_fail(db: AsyncSession, ip: str) -> None:
     """登录成功后清空该 IP 的失败记录。"""
-    with _login_lock:
-        _login_fail.pop(ip, None)
-        _login_locked.pop(ip, None)
-
-
-def _prune_login_state(now: float) -> None:
-    """清掉已过期/超龄条目，防止内存泄漏。"""
-    for k in [k for k, u in _login_locked.items() if u <= now]:
-        _login_locked.pop(k, None)
-    cutoff = now - 86400
-    for k in [k for k, lst in _login_fail.items() if not lst or lst[-1] < cutoff]:
-        _login_fail.pop(k, None)
-
-
+    from sqlalchemy import delete
+    await db.execute(delete(LoginLock).where(LoginLock.ip == ip))
+    await db.commit()
 def _client_ip(request: Request) -> str:
     """取真实客户端 IP（无反向代理时为直连地址）。"""
     # 若有反代可在此读取 X-Forwarded-For；当前直连场景 client.host 即真实 IP
@@ -219,7 +236,7 @@ async def setup(req: SetupRequest, db: AsyncSession = Depends(get_db)):
 async def login(req: LoginRequest, request: Request, db: AsyncSession = Depends(get_db)):
     ip = _client_ip(request)
     # 防爆破：该 IP 已被锁定 → 直接 429
-    wait = _is_login_locked(ip)
+    wait = await _is_login_locked(db, ip)
     if wait is not None:
         logger.warning("登录被拒（限流）：来源 %s 处于锁定期，尚需约 %ds", ip, int(wait))
         raise HTTPException(status.HTTP_429_TOO_MANY_REQUESTS, "尝试过于频繁，请稍后再试")
@@ -227,7 +244,7 @@ async def login(req: LoginRequest, request: Request, db: AsyncSession = Depends(
     user = (await db.execute(select(User).where(User.username == req.username))).scalar_one_or_none()
     ok = bool(user and user.is_active and verify_password(req.password, user.password_hash))
     if not ok:
-        triggered = _record_login_fail(ip)
+        triggered = await _record_login_fail(db, ip)
         logger.warning("登录失败：来源 %s，用户名 %r", ip, req.username)
         if triggered:
             raise HTTPException(status.HTTP_429_TOO_MANY_REQUESTS, "尝试过于频繁，账号已临时锁定，请稍后再试")
@@ -235,7 +252,7 @@ async def login(req: LoginRequest, request: Request, db: AsyncSession = Depends(
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "用户名或密码错误")
 
     # 登录成功：清失败记录 + 日志留痕
-    _clear_login_fail(ip)
+    await _clear_login_fail(db, ip)
     user.last_login_at = datetime.now(timezone.utc)
     await db.commit()
     await db.refresh(user)

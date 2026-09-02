@@ -1,10 +1,10 @@
 """生长发育"""
 
 from datetime import date, datetime
-from enum import Enum
-from typing import List, Literal, Optional
+from typing import Optional
 
 from pydantic import BaseModel, ConfigDict, Field
+
 
 # ============ 生长发育 ============
 class GrowthRecordBase(BaseModel):

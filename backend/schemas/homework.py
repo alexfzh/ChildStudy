@@ -1,10 +1,10 @@
 """作业记录"""
 
 from datetime import date, datetime
-from enum import Enum
-from typing import List, Literal, Optional
+from typing import Optional
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict
+
 
 # ============ 作业记录 ============
 class HomeworkBase(BaseModel):
