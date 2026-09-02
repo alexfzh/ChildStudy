@@ -13,15 +13,24 @@
         <el-button type="primary" :loading="loading" class="w-full" @click="submit">登录</el-button>
       </el-form>
       <p v-if="errMsg" class="text-red-500 text-sm mt-3">{{ errMsg }}</p>
+      <!-- 局域网访问提示 -->
+      <div class="mt-4 p-3 bg-slate-50 rounded-lg text-xs text-slate-500 leading-relaxed">
+        <div class="font-medium text-slate-700 mb-1">📱 局域网访问</div>
+        <div v-if="lanUrl">
+          其他设备请访问：<span class="font-mono text-brand-600 break-all">{{ lanUrl }}</span>
+        </div>
+        <div v-else class="text-slate-400">正在获取服务器地址...</div>
+      </div>
     </div>
   </div>
 </template>
 
 <script setup>
-import { ref, reactive } from "vue";
+import { ref, reactive, onMounted } from "vue";
 import { useRouter, useRoute } from "vue-router";
 import { useAuthStore } from "@/stores/auth";
 import { useChildStore } from "@/stores/child";
+import { configAPI } from "@/api";
 
 const router = useRouter();
 const route = useRoute();
@@ -31,6 +40,16 @@ const childStore = useChildStore();
 const form = reactive({ username: "", password: "" });
 const loading = ref(false);
 const errMsg = ref("");
+const lanUrl = ref("");
+
+async function loadLanUrl() {
+  try {
+    const cfg = await configAPI.getPublicConfig();
+    lanUrl.value = cfg.lan_url || "";
+  } catch {
+    lanUrl.value = "";
+  }
+}
 
 async function submit() {
   if (!form.username || !form.password) {
@@ -41,20 +60,15 @@ async function submit() {
   errMsg.value = "";
   try {
     const user = await auth.login(form.username, form.password);
-    // 加载孩子列表（家长端需要）
     if (user.role === "parent") {
       try {
         await childStore.loadChildren();
       } catch (e) {
-        // 容错：即使拉失败也不阻塞登录
         console.warn("加载孩子列表失败：", e);
       }
     } else if (user.role === "child") {
-      // 孩子账号后端禁止访问 /api/children，用登录信息自举 childStore，
-      // 否则各页面读到的 childStore.currentId 为 null，会提示“先选择孩子”
       childStore.bootstrapChild({ id: user.child_id, name: user.display_name });
     }
-    // 跳转到登录前想去的页面或首页
     const next = route.query.redirect || (user.role === "child" ? "/child" : "/");
     router.push(next);
   } catch (e) {
@@ -63,6 +77,10 @@ async function submit() {
     loading.value = false;
   }
 }
+
+onMounted(() => {
+  loadLanUrl();
+});
 </script>
 
 <style scoped>

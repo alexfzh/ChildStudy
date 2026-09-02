@@ -33,15 +33,24 @@
           登录后可以进入「系统设置 → 账号管理」为每个孩子创建登录账号。
         </p>
       </div>
+      <!-- 局域网访问提示 -->
+      <div class="mt-4 p-3 bg-slate-50 rounded-lg text-xs text-slate-500 leading-relaxed">
+        <div class="font-medium text-slate-700 mb-1">📱 其他设备访问地址</div>
+        <div v-if="lanUrl">
+          请在平板/手机浏览器打开：<span class="font-mono text-brand-600 break-all">{{ lanUrl }}</span>
+        </div>
+        <div v-else class="text-slate-400">正在获取服务器地址...</div>
+      </div>
     </div>
   </div>
 </template>
 
 <script setup>
-import { ref, reactive } from "vue";
+import { ref, reactive, onMounted } from "vue";
 import { useRouter } from "vue-router";
 import { useAuthStore } from "@/stores/auth";
 import { useChildStore } from "@/stores/child";
+import { configAPI } from "@/api";
 
 const router = useRouter();
 const auth = useAuthStore();
@@ -56,6 +65,16 @@ const form = reactive({
 });
 const loading = ref(false);
 const errMsg = ref("");
+const lanUrl = ref("");
+
+async function loadLanUrl() {
+  try {
+    const cfg = await configAPI.getPublicConfig();
+    lanUrl.value = cfg.lan_url || "";
+  } catch {
+    lanUrl.value = "";
+  }
+}
 
 async function submit() {
   errMsg.value = "";
@@ -79,7 +98,6 @@ async function submit() {
       password: form.password,
       displayName: form.display_name,
     });
-    // 登录后立刻加载孩子列表
     try {
       await childStore.loadChildren();
     } catch (e) {
@@ -92,6 +110,10 @@ async function submit() {
     loading.value = false;
   }
 }
+
+onMounted(() => {
+  loadLanUrl();
+});
 </script>
 
 <style scoped>

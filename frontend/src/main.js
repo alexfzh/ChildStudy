@@ -15,16 +15,6 @@ dayjs.extend(utc);
 dayjs.extend(timezone);
 dayjs.tz.setDefault("Asia/Shanghai");
 
-// PWA: 生产环境注册 Service Worker（离线缓存静态资源）
-if ("serviceWorker" in navigator && import.meta.env.PROD) {
-  window.addEventListener("load", () => {
-    navigator.serviceWorker
-      .register("/sw.js")
-      .then((reg) => console.log("[PWA] Service Worker 注册成功:", reg.scope))
-      .catch((err) => console.warn("[PWA] Service Worker 注册失败:", err));
-  });
-}
-
 const app = createApp(App);
 
 // 全局错误边界：集中捕获组件渲染/生命周期/事件处理中的未捕获错误，

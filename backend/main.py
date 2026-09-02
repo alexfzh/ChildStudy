@@ -59,11 +59,10 @@ app = FastAPI(
 )
 
 # 跨域：v1.6.0 起从 .env 的 ALLOWED_ORIGINS 读取（逗号分隔）
-# 默认是本地开发三个 origin：5173 (vite dev) / 8000 (后端同源) / 11434 (Ollama 若有)
-# LAN 访问场景：在 .env 里追加 http://192.168.x.x:5173 等地址后重启
+# 默认 *：家庭局域网环境，所有 origin 允许；如有外网暴露需求，请在 .env 里限制具体地址
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[o.strip() for o in settings.allowed_origins.split(",") if o.strip()],
+    allow_origins=[o.strip() for o in settings.allowed_origins.split(",") if o.strip()] or ["*"],
     allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],

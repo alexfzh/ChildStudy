@@ -31,7 +31,7 @@ class Settings(BaseSettings):
     # 多用户认证（v1.6.0）
     jwt_secret: str = "change-me-in-production-please-use-32-bytes-random"  # 生产必须改！
     jwt_expire_seconds: int = 86400  # 24h
-    allowed_origins: str = "http://localhost:5173,http://127.0.0.1:5173,http://localhost:8000,http://127.0.0.1:8000"  # 逗号分隔，CORS 白名单
+    allowed_origins: str = "*"  # 逗号分隔，CORS 白名单；家庭局域网默认全允许，生产环境可限制具体 origin
 
 
 settings = Settings()
