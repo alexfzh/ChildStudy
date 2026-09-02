@@ -2,7 +2,7 @@
 
 > 隐私优先的家庭学情追踪平台 · 数据完全本地存储 · AI 分析靠"导出→外部AI→粘回"
 
-![version](https://img.shields.io/badge/version-1.7.1-blue) ![license](https://img.shields.io/badge/license-MIT-green) ![privacy](https://img.shields.io/badge/privacy-100%25%20local-orange)
+![version](https://img.shields.io/badge/version-1.7.2-blue) ![license](https://img.shields.io/badge/license-MIT-green) ![privacy](https://img.shields.io/badge/privacy-100%25%20local-orange)
 
 ## ✨ 核心理念
 
@@ -369,6 +369,101 @@ ChildStudy/
 - ✅ 不收集任何遥测/分析数据
 - ✅ 认证使用本地 JWT，无第三方鉴权服务
 
+## 🛡️ 部署安全须知
+
+适用于把系统暴露在局域网 / 公网的场景。本机纯本地（`127.0.0.1`）使用可忽略。
+
+### 1. 单 worker 部署（必须）
+
+登录防爆破状态（`_login_fail` / `_login_locked`）保存在**进程内存**中。
+如果用 `uvicorn --workers N`（N ≥ 2）启动：
+
+- 每个 worker 独立计数，攻击者分散到不同 worker 绕过锁定（阈值 5 次 → 实际可尝试 5 × N 次）
+- 锁定状态在 worker 重启后清零
+
+**正确姿势**：
+
+```bash
+# ✅ 推荐：单 worker + reload 模式（开发友好，性能足够 LAN 用）
+uvicorn main:app --host 0.0.0.0 --port 8000
+
+# ⚠️ 如确需多 worker（公网高并发），需先把防爆破状态迁移到 SQLite/Redis：
+#    routers/auth.py:_login_fail / _login_locked → 持久化存储
+```
+
+### 2. JWT_SECRET 必须独立生成
+
+`config.py` 默认值是 placeholder，**生产环境必须替换**：
+
+```bash
+# 生成 64 字符随机密钥（base64-encoded 32 bytes）
+python -c "import secrets; print(secrets.token_urlsafe(48))"
+```
+
+写入 `.env` 的 `JWT_SECRET=` 字段。
+
+**Rotation 建议**：
+- 定期（如每 90 天）轮换一次
+- 轮换时旧 token 全部失效，用户需重新登录（24h JWT 默认过期时间，无需主动撤销）
+- 不要把新 secret 与旧 secret 同时生效（兼容性陷阱）
+
+### 3. CORS 不要启用 credentials
+
+当前 `main.py` 用 `allow_credentials=False` + 默认 `allow_origins="*"`（LAN 场景）。
+**严禁**同时把 `ALLOWED_ORIGINS` 收紧到具体 origin **又** `allow_credentials=True` —— 这会触发 CSRF 风险。
+
+如未来要加 cookie/session 鉴权：
+
+```python
+# 必须同时：specific origins + credentials=True + 显式 allow_headers
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["https://your.domain.com"],  # 具体域名，不要 *
+    allow_credentials=True,                     # 显式开启
+    allow_methods=["GET", "POST", "PUT", "DELETE"],
+    allow_headers=["Authorization", "Content-Type"],
+)
+```
+
+### 4. 数据库文件保护
+
+```bash
+# SQLite 文件权限：仅运行用户可读写
+chmod 600 backend/data/childstudy.db
+
+# 定期备份（业务连续性，不是安全）
+cp backend/data/childstudy.db backend/data/backup-$(date +%Y%m%d).db
+```
+
+### 5. 端口暴露策略
+
+| 场景 | 建议 |
+|------|------|
+| 单机本地 | `APP_HOST=127.0.0.1` |
+| 家庭 LAN | `APP_HOST=0.0.0.0` + 路由器不开端口映射 |
+| 公网暴露 | ⚠️ **强烈不推荐**。如必须：前置 nginx + HTTPS + fail2ban + 限流 |
+
+**不要**直接把 8000 端口暴露公网 —— 当前没有 rate limit、没有 HTTPS（JWT 明文传输）、没有 brute-force 防护（仅 IP 层 + 内存锁定）。
+
+### 6. 依赖更新
+
+```bash
+# 后端
+cd backend && pip install --upgrade -r requirements.txt
+cd backend && pip install --upgrade -r requirements-dev.txt
+
+# 前端
+cd frontend && npm update
+```
+
+关注 CVE：https://github.com/advisories （查询 fastapi / sqlalchemy / pydantic / vue / vite）。
+
+### 7. 已知限制（roadmap 跟踪）
+
+- [ ] 防爆破状态迁移到 SQLite（多 worker 安全）—— 见 `routers/auth.py:_login_fail`
+- [ ] Pydantic v3 移除 class-based `Config` 时的迁移（当前是 deprecation warning，不阻塞）
+- [ ] models.py 736 行 / schemas.py 1118 行过大，业务域拆分
+- [ ] routers/question_banks.py 935 行可拆 admin/practice
 ## ⚙️ 环境变量（.env）
 
 ```env
