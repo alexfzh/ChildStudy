@@ -7,6 +7,7 @@ from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import and_, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
 from database import get_db
 from dependencies import assert_child_access, get_accessible_child_ids, require_parent
@@ -15,10 +16,10 @@ from models import (
     Exercise,
     KnowledgePoint,
     KnowledgePointUnit,
+    PointsLog,
     Question,
     QuestionBank,
     QuestionKnowledgePoint,
-    QuestionUnit,
     TextbookUnit,
     WrongQuestion,
 )
@@ -112,7 +113,7 @@ async def _attach_unit_info(
     )
     rows = (await db.execute(stmt)).all()
     info = {}
-    for kp_id, code, title_zh, relevance in rows:
+    for kp_id, code, title_zh, _relevance in rows:
         if kp_id not in info:  # 第一个出现的（已按 primary 排前）
             info[kp_id] = {"unit_code": code, "unit_title_zh": title_zh}
     return info
@@ -194,6 +195,22 @@ async def start_exercise(
     child = await db.get(Child, data.child_id)
     if not child:
         raise HTTPException(404, "孩子档案不存在")
+
+    # 幂等保护：同一 child + bank 若有未提交练习，直接复用，避免快速连点创建多条记录
+    existing_stmt = select(Exercise).where(
+        and_(
+            Exercise.child_id == data.child_id,
+            Exercise.bank_id == data.bank_id,
+            Exercise.submitted_at.is_(None),
+        )
+    ).order_by(Exercise.created_at.desc())
+    existing_result = await db.execute(existing_stmt)
+    existing_exercise = existing_result.scalars().first()
+    if existing_exercise:
+        await db.refresh(existing_exercise)
+        if existing_exercise.bank is None:
+            existing_exercise.bank = bank
+        return existing_exercise
 
     stmt = select(Question).where(Question.bank_id == data.bank_id)
 
@@ -297,6 +314,8 @@ async def start_exercise(
     db.add(exercise)
     await db.commit()
     await db.refresh(exercise)
+    # 显式赋值 bank 关系，避免响应序列化时 bank_title 触发 lazy load 报 greenlet 错误
+    exercise.bank = bank
 
     return exercise
 
@@ -411,6 +430,79 @@ async def submit_exercise(
         raise HTTPException(500, "练习提交失败（进度联动异常），请重试") from e
 
     await db.refresh(exercise)
+
+    # ====== 激励联动：积分 + 首次通关成就 ======
+    # 与主提交分离：练习记录已落库，即使激励计算出错也不应回滚已提交的练习。
+    # 每日上限 10 分，同一孩子同一自然日最多只能得到 10 个 practice_perfect 积分。
+    points_earned = 0
+    daily_points_total = 0
+    daily_points_cap = 10
+    new_achievements = []
+
+    if correct_count == total and total > 0:
+        try:
+            today_start = datetime.combine(date.today(), datetime.min.time(), tzinfo=timezone.utc)
+            today_logs = (await db.execute(
+                select(func.coalesce(func.sum(PointsLog.points), 0)).where(
+                    PointsLog.child_id == exercise.child_id,
+                    PointsLog.source == "practice_perfect",
+                    PointsLog.created_at >= today_start,
+                )
+            )).scalar_one()
+            daily_points_total = int(today_logs or 0)
+            logger.info("积分判定 child_id=%s today=%s cap=%s score=%s/%s",
+                        exercise.child_id, daily_points_total, daily_points_cap, correct_count, total)
+            if daily_points_total < daily_points_cap:
+                points_earned = 1
+                # 访问 bank 标题可能会触发 lazy load，提前单独查
+                bank = await db.get(QuestionBank, exercise.bank_id)
+                bank_title = bank.title if bank else f"题库#{exercise.bank_id}"
+                db.add(PointsLog(
+                    child_id=exercise.child_id,
+                    points=1,
+                    source="practice_perfect",
+                    source_id=exercise.id,
+                    description=f"练习《{bank_title}》全对 +1",
+                ))
+                daily_points_total += 1
+                await db.commit()
+                logger.info("积分发放成功 child_id=%s daily_total=%s", exercise.child_id, daily_points_total)
+        except Exception as e:
+            logger.warning("积分发放失败（不影响主提交）: %s", e, exc_info=True)
+
+    # 首次通关题库：得分 ≥80% 且此前未得过同一题库的通关成就
+    if score >= 80:
+        try:
+            from routers.rewards import get_or_create_achievement, grant_achievement
+            bank = await db.get(QuestionBank, exercise.bank_id)
+            bank_title = bank.title if bank else f"题库#{exercise.bank_id}"
+            ach = await get_or_create_achievement(
+                db,
+                code=f"bank_clear_{exercise.bank_id}",
+                name=f"🎯 征服《{bank_title}》",
+                desc=f"首次在《{bank_title}》得分达到 80% 以上",
+                cond_type="bank_clear",
+                cond_val=exercise.bank_id,
+            )
+            ca, created = await grant_achievement(
+                db, exercise.child_id, ach.id, exam_id=None
+            )
+            logger.info("成就判定 child_id=%s bank=%s score=%s ach_id=%s created=%s",
+                        exercise.child_id, exercise.bank_id, score, ach.id, created)
+            if created:
+                new_achievements.append(ca)
+                await db.commit()
+        except Exception as e:
+            logger.warning("成就解锁失败（不影响主提交）: %s", e, exc_info=True)
+
+    # 构造响应：动 ORM 字段会被 Pydantic from_attributes 读到
+    exercise.points_earned = points_earned
+    exercise.daily_points_total = daily_points_total
+    exercise.daily_points_cap = daily_points_cap
+    exercise.new_achievements = new_achievements
+    # 显式赋值 bank 关系，避免响应序列化时 bank_title 触发 lazy load 报 greenlet 错误
+    if exercise.bank is None:
+        exercise.bank = await db.get(QuestionBank, exercise.bank_id)
     return exercise
 
 
@@ -425,6 +517,9 @@ async def get_exercise(
     if not exercise:
         raise HTTPException(404, "练习记录不存在")
     assert_child_access(accessible, exercise.child_id)
+    # 显式 load bank 关系，避免响应序列化时 bank_title 触发 lazy load
+    if exercise.bank is None:
+        exercise.bank = await db.get(QuestionBank, exercise.bank_id)
     return exercise
 
 
@@ -434,10 +529,11 @@ async def list_exercises(
     db: AsyncSession = Depends(get_db),
     accessible: set[int] = Depends(get_accessible_child_ids),
 ):
-    """获取孩子的练习历史"""
+    """获取孩子的练习历史（含题库标题，方便看板直接用）"""
     result = await db.execute(
         select(Exercise)
         .where(Exercise.child_id == child_id)
+        .options(selectinload(Exercise.bank))
         .order_by(Exercise.created_at.desc())
     )
     return result.scalars().unique().all()
@@ -548,7 +644,7 @@ async def recommend_questions(
             .order_by(QuestionKnowledgePoint.is_primary.desc())
         )
         rows = (await db.execute(primary_stmt)).all()
-        for qid, kp_id, is_primary, kp_name in rows:
+        for qid, kp_id, _is_primary, kp_name in rows:
             if qid not in primary_qid_to_meta:
                 primary_qid_to_meta[qid] = {
                     "matched_kp_ids": [kp_id],

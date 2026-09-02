@@ -66,6 +66,7 @@
               size="large"
               class="!text-base !font-semibold !px-6"
               :loading="starting"
+              :disabled="starting"
               @click="startExercise"
             >
               🚀 开始练习
