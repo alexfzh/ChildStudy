@@ -23,7 +23,26 @@ from routers.children import (
     list_grade_history,
     update_child,
 )
+from routers.exercises import (
+    get_exercise,
+    list_exercises,
+    recommend_questions,
+    start_exercise,
+    submit_exercise,
+)
 from routers.homework import create_homework, delete_homework, list_homeworks, update_homework
+from routers.interests import (
+    create as create_interest,
+)
+from routers.interests import (
+    delete as delete_interest,
+)
+from routers.interests import (
+    list_by_child as list_interests,
+)
+from routers.interests import (
+    update as update_interest,
+)
 from routers.knowledge_points import (
     create_knowledge_point,
     delete_knowledge_point,
@@ -49,6 +68,18 @@ from routers.rewards import (
     list_rewards,
     update_reward,
 )
+from routers.social_emotional import (
+    create as create_social_emotional,
+)
+from routers.social_emotional import (
+    delete as delete_social_emotional,
+)
+from routers.social_emotional import (
+    list_by_child as list_social_emotional,
+)
+from routers.social_emotional import (
+    update as update_social_emotional,
+)
 from routers.textbook import (
     get_unit,
     list_units,
@@ -58,9 +89,13 @@ from routers.timeline import create_event, delete_event, list_events, update_eve
 from schemas import (
     ChildCreate,
     ChildUpdate,
+    ExerciseStartRequest,
+    ExerciseSubmitRequest,
     GradeHistoryCreate,
     HomeworkCreate,
     HomeworkUpdate,
+    InterestCreate,
+    InterestUpdate,
     KnowledgePointCreate,
     KnowledgePointUpdate,
     QuestionBankCreate,
@@ -68,6 +103,8 @@ from schemas import (
     QuestionCreate,
     RewardCreate,
     RewardUpdate,
+    SocialEmotionalCreate,
+    SocialEmotionalUpdate,
     TimelineCreate,
     TimelineUpdate,
 )
@@ -379,3 +416,131 @@ class TestTextbookCRUD:
         uid = units[0]["id"]
         fetched = await get_unit(uid, db=db_session)
         assert fetched["id"] == uid
+
+
+# ==================== Social Emotional CRUD ====================
+
+class TestSocialEmotionalCRUD:
+    async def test_create_and_list(self, db_session, child_factory, parent):
+        child = await child_factory()
+        rec = await create_social_emotional(
+            child.id,
+            SocialEmotionalCreate(record_date=date.today(), mood_score=4, emotion_tags=["happy"]),
+            db=db_session, accessible=_acc(child),
+        )
+        assert rec.id is not None
+        items = await list_social_emotional(child.id, db=db_session, accessible=_acc(child))
+        assert any(it.id == rec.id for it in items)
+
+    async def test_update_social_emotional(self, db_session, child_factory, parent):
+        child = await child_factory()
+        rec = await create_social_emotional(
+            child.id,
+            SocialEmotionalCreate(record_date=date.today(), mood_score=3, emotion_tags=["ok"]),
+            db=db_session, accessible=_acc(child),
+        )
+        updated = await update_social_emotional(
+            rec.id, SocialEmotionalUpdate(mood_score=5), db=db_session, accessible=_acc(child),
+        )
+        assert updated.mood_score == 5
+
+    async def test_delete_social_emotional(self, db_session, child_factory, parent):
+        child = await child_factory()
+        rec = await create_social_emotional(
+            child.id,
+            SocialEmotionalCreate(record_date=date.today(), mood_score=2, emotion_tags=["sad"]),
+            db=db_session, accessible=_acc(child),
+        )
+        await delete_social_emotional(rec.id, db=db_session, accessible=_acc(child))
+        items = await list_social_emotional(child.id, db=db_session, accessible=_acc(child))
+        assert not any(it.id == rec.id for it in items)
+
+
+# ==================== Interests CRUD ====================
+
+class TestInterestsCRUD:
+    async def test_create_and_list(self, db_session, child_factory, parent):
+        child = await child_factory()
+        rec = await create_interest(
+            child.id,
+            InterestCreate(record_date=date.today(), activity_type="运动", activity_name="游泳", duration_minutes=30),
+            db=db_session, accessible=_acc(child),
+        )
+        assert rec.id is not None
+        items = await list_interests(child.id, db=db_session, accessible=_acc(child))
+        assert any(it.id == rec.id for it in items)
+
+    async def test_update_interest(self, db_session, child_factory, parent):
+        child = await child_factory()
+        rec = await create_interest(
+            child.id,
+            InterestCreate(record_date=date.today(), activity_type="音乐", activity_name="钢琴", duration_minutes=20),
+            db=db_session, accessible=_acc(child),
+        )
+        updated = await update_interest(
+            rec.id, InterestUpdate(duration_minutes=45), db=db_session, accessible=_acc(child),
+        )
+        assert updated.duration_minutes == 45
+
+    async def test_delete_interest(self, db_session, child_factory, parent):
+        child = await child_factory()
+        rec = await create_interest(
+            child.id,
+            InterestCreate(record_date=date.today(), activity_type="阅读", activity_name="绘本", duration_minutes=15),
+            db=db_session, accessible=_acc(child),
+        )
+        await delete_interest(rec.id, db=db_session, accessible=_acc(child))
+        items = await list_interests(child.id, db=db_session, accessible=_acc(child))
+        assert not any(it.id == rec.id for it in items)
+
+
+# ==================== Exercises CRUD ====================
+
+class TestExercisesCRUD:
+    async def test_start_and_list(self, db_session, child_factory):
+        child = await child_factory()
+        bank = await create_bank(
+            QuestionBankCreate(grade="5", subject="math", title="bankEx"),
+            db=db_session,
+        )
+        await create_question(
+            bank["id"],
+            QuestionCreate(bank_id=bank["id"], knowledge_point="kp1", content="1+1=?", options=["2","3","4","5"], correct_answer="A", difficulty="easy"),
+            db=db_session,
+        )
+        ex = await start_exercise(
+            ExerciseStartRequest(child_id=child.id, bank_id=bank["id"], count=1),
+            db=db_session, accessible=_acc(child),
+        )
+        assert ex.id is not None
+        items = await list_exercises(child_id=child.id, db=db_session, accessible=_acc(child))
+        assert any(it.id == ex.id for it in items)
+
+    async def test_submit_and_get(self, db_session, child_factory):
+        child = await child_factory()
+        bank = await create_bank(
+            QuestionBankCreate(grade="5", subject="math", title="bankEx2"),
+            db=db_session,
+        )
+        q = await create_question(
+            bank["id"],
+            QuestionCreate(bank_id=bank["id"], knowledge_point="kp1", content="2+2=?", options=["3","4","5","6"], correct_answer="D", difficulty="easy"),
+            db=db_session,
+        )
+        ex = await start_exercise(
+            ExerciseStartRequest(child_id=child.id, bank_id=bank["id"], count=1),
+            db=db_session, accessible=_acc(child),
+        )
+        submitted = await submit_exercise(
+            ex.id,
+            ExerciseSubmitRequest(answers=[{"question_id": q.id, "selected": "D"}]),
+            db=db_session, accessible=_acc(child),
+        )
+        assert submitted.score == 100.0
+        fetched = await get_exercise(ex.id, db=db_session, accessible=_acc(child))
+        assert fetched.id == ex.id
+
+    async def test_recommend(self, db_session, child_factory):
+        child = await child_factory()
+        rec = await recommend_questions(child.id, db=db_session, accessible=_acc(child))
+        assert rec.suggestion
