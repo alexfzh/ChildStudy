@@ -23,6 +23,7 @@
           <div v-if="form.mode === 'manual'">
             <label class="block text-sm font-medium text-slate-700 mb-1">知识点（留空=随机）</label>
             <el-select
+              ref="kpSelectRef"
               v-model="form.knowledge_points"
               multiple
               filterable
@@ -30,6 +31,7 @@
               default-first-option
               placeholder="选择或输入知识点"
               class="!w-full"
+              @change="onKpChange"
             >
               <el-option
                 v-for="kp in allKnowledgePoints"
@@ -57,9 +59,15 @@
             <el-slider v-model="form.count" :min="1" :max="20" :step="1" show-stops :marks="{ 5: '5', 10: '10', 15: '15', 20: '20' }" />
           </div>
 
-          <div class="flex justify-end gap-2 pt-2">
-            <el-button @click="$router.back()">返回</el-button>
-            <el-button type="primary" :loading="starting" @click="startExercise">
+          <div class="flex justify-end gap-3 pt-4">
+            <el-button size="large" @click="$router.back()">返回</el-button>
+            <el-button
+              type="primary"
+              size="large"
+              class="!text-base !font-semibold !px-6"
+              :loading="starting"
+              @click="startExercise"
+            >
               🚀 开始练习
             </el-button>
           </div>
@@ -84,7 +92,7 @@
             <button
               v-for="(q, idx) in exercise.questions"
               :key="q.id"
-              class="w-6 h-6 rounded text-xs font-medium transition-all flex-shrink-0"
+              class="w-9 h-9 md:w-8 md:h-8 rounded text-sm font-medium transition-all flex-shrink-0"
               :class="isAnswered(q.id)
                 ? 'bg-green-500 text-white'
                 : 'bg-slate-200 text-slate-500 hover:bg-slate-300'"
@@ -97,7 +105,13 @@
           <div class="text-sm text-slate-500">
             已答 <span class="text-brand-600 font-medium">{{ answeredCount }}</span> / {{ exercise.questions.length }}
           </div>
-          <el-button type="primary" :disabled="answeredCount < exercise.questions.length" @click="submitAll">
+          <el-button
+            type="primary"
+            size="large"
+            class="!text-base !font-semibold"
+            :disabled="answeredCount < exercise.questions.length"
+            @click="submitAll"
+          >
             提交答案
           </el-button>
         </div>
@@ -165,16 +179,24 @@
               <el-button
                 :disabled="currentIndex === 0"
                 @click="currentIndex--"
-                size="small"
+                size="default"
               >
                 ⬅ 上一题
               </el-button>
               <el-button
                 :disabled="currentIndex === exercise.questions.length - 1"
                 @click="currentIndex++"
-                size="small"
+                size="default"
               >
                 下一题 ➡
+              </el-button>
+              <el-button
+                type="primary"
+                size="default"
+                :disabled="answeredCount < exercise.questions.length"
+                @click="submitAll"
+              >
+                提交答案
               </el-button>
             </div>
           </div>
@@ -184,16 +206,34 @@
 
     <!-- 阶段3：结果 -->
     <div v-else-if="phase === 'result'" class="space-y-6">
-      <div class="text-center mb-6">
-        <div class="text-5xl mb-3">{{ resultEmoji }}</div>
-        <h2 class="text-2xl font-bold text-slate-800">练习完成！</h2>
-        <div class="mt-3">
-          <span class="text-4xl font-bold" :class="scoreColor">{{ result.score }}</span>
-          <span class="text-lg text-slate-500">分</span>
+      <!-- 🎉 庆祝卡片：得分 + 用时 + 获得积分 + 新成就 -->
+      <div class="rounded-2xl p-6 bg-gradient-to-br from-amber-50 via-white to-emerald-50 border-2 border-amber-200 shadow-soft">
+        <div class="text-center">
+          <div class="text-5xl mb-2">{{ resultEmoji }}</div>
+          <h2 class="text-2xl font-bold text-slate-800">练习完成！</h2>
+          <div class="mt-3">
+            <span class="text-5xl font-bold" :class="scoreColor">{{ result.score }}</span>
+            <span class="text-xl text-slate-500 ml-1">分</span>
+          </div>
+          <p class="text-sm text-slate-500 mt-1">
+            答对 {{ result.correct_count }} / {{ result.total_questions }} 题
+            <span v-if="result.time_spent" class="text-slate-400 ml-2">· 用时 {{ formatSeconds(result.time_spent) }}</span>
+          </p>
         </div>
-        <p class="text-sm text-slate-500 mt-1">
-          答对 {{ result.correct_count }} / {{ result.total_questions }} 题
-        </p>
+
+        <!-- 积分 + 成就行 -->
+        <div v-if="result.points_earned > 0 || (result.new_achievements && result.new_achievements.length > 0)"
+             class="mt-5 flex flex-wrap items-center justify-center gap-2">
+          <span v-if="result.points_earned > 0"
+                class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-amber-100 text-amber-800 rounded-full text-sm font-medium border border-amber-300">
+            🌟 获得 +{{ result.points_earned }} 积分
+            <span class="text-xs text-amber-600 ml-1">（今日 {{ result.daily_points_total }}/{{ result.daily_points_cap }}）</span>
+          </span>
+          <span v-for="ach in (result.new_achievements || [])" :key="ach.id"
+                class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-purple-100 text-purple-800 rounded-full text-sm font-medium border border-purple-300">
+            {{ach.achievement?.icon || '🏆'}} {{ ach.achievement?.name || '解锁成就' }}
+          </span>
+        </div>
       </div>
 
       <!-- 得分条 -->
@@ -260,8 +300,8 @@
       </div>
 
       <div class="flex justify-center gap-3 pt-4">
-        <el-button @click="$router.push('/question-banks')">返回题库</el-button>
-        <el-button type="primary" @click="restart">再来一组</el-button>
+        <el-button size="large" @click="$router.push('/question-banks')">返回题库</el-button>
+        <el-button type="primary" size="large" class="!text-base !font-semibold !px-6" @click="restart">再来一组</el-button>
       </div>
     </div>
   </div>
@@ -285,6 +325,13 @@ const currentIndex = ref(0);
 const userAnswers = reactive({}); // { question_id: selected }
 const result = ref(null);
 const selectedAnswer = ref("");
+// 知识点下拉引用：选择后自动收起（pad 友好，避免下拉挡住下一个按钮）
+const kpSelectRef = ref(null);
+function onKpChange() {
+  // Element Plus el-select 默认多选不收起；调用 blur 手动收起。
+  // setTimeout 延后一帧，确保选中的点击事件走完再失去焦点。
+  setTimeout(() => kpSelectRef.value?.blur(), 0);
+}
 
 // 计时器
 const elapsedSeconds = ref(0);
@@ -295,6 +342,13 @@ const formattedTime = computed(() => {
   const s = (elapsedSeconds.value % 60).toString().padStart(2, "0");
   return `${m}:${s}`;
 });
+
+function formatSeconds(sec) {
+  const m = Math.floor(sec / 60);
+  const s = sec % 60;
+  if (m === 0) return `${s} 秒`;
+  return `${m} 分 ${s.toString().padStart(2, "0")} 秒`;
+}
 let timerInterval = null;
 function startTimer() {
   stopTimer();
