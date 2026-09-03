@@ -31,8 +31,11 @@ jobs:
         run: python -m ruff check .
       - name: Pytest
         run: python -m pytest -q
+      # 注:audit-schema-router.py 会 print 中文。GitHub Windows runner(英文系统,
+      # cp1252 代码页)默认 stdout 无法编码中文 → UnicodeEncodeError 崩。
+      # -X utf8 强制 UTF-8 输出,规避平台编码差异。
       - name: Schema-router audit
-        run: python scripts/audit-schema-router.py
+        run: python -X utf8 scripts/audit-schema-router.py
 
   frontend:
     runs-on: ubuntu-latest

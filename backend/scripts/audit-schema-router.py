@@ -123,6 +123,10 @@ def audit(strict=False):
 
 
 if __name__ == '__main__':
+    # 脚本会 print 中文;GitHub Windows runner(英文系统 cp1252)默认 stdout 无法编码
+    # 中文会抛 UnicodeEncodeError。强制 UTF-8 输出,规避平台编码差异。
+    if hasattr(sys.stdout, 'reconfigure'):
+        sys.stdout.reconfigure(encoding='utf-8', errors='replace')
     ap = argparse.ArgumentParser()
     ap.add_argument('--strict', action='store_true')
     args = ap.parse_args()
