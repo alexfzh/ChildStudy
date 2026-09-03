@@ -266,88 +266,160 @@ watch(
 </script>
 
 <template>
-  <div v-if="!childStore.currentId" class="card p-10 text-center">
-    <div class="text-5xl mb-3">👋</div>
-    <div class="text-slate-700 font-medium mb-1">还没有添加孩子档案</div>
-    <div class="text-sm text-slate-500 mb-5">先添加一个孩子，才能记录数据</div>
-    <button class="btn-primary" @click="router.push('/children')">前往添加</button>
-  </div>
-
-  <div v-else-if="loading" class="text-center py-20 text-slate-400">加载中…</div>
-
-  <div v-else-if="dashboard" class="space-y-5">
-    <!-- 顶部欢迎 + 统计 -->
-    <div class="card p-5">
-      <div class="flex items-center justify-between flex-wrap gap-3">
-        <div>
-          <div class="text-sm text-slate-500">{{ childStore.current?.grade }}</div>
-          <h2 class="text-xl font-semibold text-slate-800 mt-0.5">
-            {{ dashboard.child_name }} 的学习看板
-          </h2>
-        </div>
-        <div class="flex gap-2">
-          <button class="btn-secondary" @click="router.push('/children')">管理档案</button>
-          <button class="btn-primary" @click="goAddExam">+ 录入考试</button>
-        </div>
-      </div>
-
-      <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mt-5">
-        <div class="bg-slate-50 rounded-xl p-4">
-          <div class="text-xs text-slate-500">累计考试</div>
-          <div class="text-2xl font-semibold text-slate-800 mt-1">{{ dashboard.total_exams }}</div>
-        </div>
-        <div class="bg-slate-50 rounded-xl p-4">
-          <div class="text-xs text-slate-500">作业记录</div>
-          <div class="text-2xl font-semibold text-slate-800 mt-1">{{ dashboard.total_homeworks }}</div>
-        </div>
-        <div class="bg-amber-50 rounded-xl p-4">
-          <div class="text-xs text-amber-700">薄弱科目</div>
-          <div class="text-base font-medium text-amber-800 mt-2 leading-tight">
-            <span v-if="dashboard.weak_subjects.length === 0">暂无明显薄弱</span>
-            <span v-else>{{ dashboard.weak_subjects.join("、") }}</span>
-          </div>
-        </div>
-        <div class="bg-brand-50 rounded-xl p-4">
-          <div class="text-xs text-brand-700">最近考试</div>
-          <div class="text-base font-medium text-brand-800 mt-2 leading-tight">
-            <span v-if="dashboard.recent_exams[0]">
-              {{ dashboard.recent_exams[0].subject }} ·
-              {{ Math.round(dashboard.recent_exams[0].score / dashboard.recent_exams[0].full_score * 100) }}%
-            </span>
-            <span v-else class="text-slate-400">暂无</span>
-          </div>
-        </div>
-      </div>
+  <div>
+    <!-- 空态：尚未添加孩子 -->
+    <div v-if="!childStore.currentId" class="card p-12 text-center">
+      <div class="text-5xl mb-3">👋</div>
+      <div class="text-base font-medium text-slate-600 mb-1">还没有添加孩子档案</div>
+      <div class="text-sm text-slate-400 mb-5">先添加一个孩子，才能开始记录学习、生长与成长数据</div>
+      <button class="btn-primary" @click="router.push('/children')">前往添加</button>
     </div>
 
+    <div v-else-if="loading" class="flex items-center justify-center py-20 text-slate-400 gap-2">
+      <span class="inline-block w-5 h-5 border-2 border-slate-300 border-t-brand-600 rounded-full animate-spin"></span>
+      <span class="text-sm">看板加载中…</span>
+    </div>
+
+    <div v-else-if="dashboard" class="space-y-5">
+      <!-- 顶部欢迎横幅 -->
+      <div class="card p-5">
+        <div class="flex items-center justify-between flex-wrap gap-3">
+          <div class="flex items-center gap-3">
+            <span class="inline-flex items-center justify-center w-11 h-11 rounded-2xl bg-gradient-to-br from-brand-500 to-brand-700 text-white text-xl shadow-sm">📊</span>
+            <div>
+              <div class="text-xs text-slate-500">{{ childStore.current?.grade }}</div>
+              <h2 class="text-xl font-semibold text-slate-800 mt-0.5">
+                {{ dashboard.child_name }} 的学习看板
+              </h2>
+              <p class="text-xs text-slate-400 mt-0.5">考试、作业、练习、成就与成长一站式掌握</p>
+            </div>
+          </div>
+          <div class="flex gap-2">
+            <button class="btn-secondary" @click="router.push('/children')">管理档案</button>
+            <button class="btn-primary" @click="goAddExam">+ 录入考试</button>
+          </div>
+        </div>
+
+        <!-- 顶部四联卡：统计 -->
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mt-5">
+          <div class="bg-slate-50/70 rounded-xl p-4 relative overflow-hidden border border-slate-100">
+            <div class="absolute left-0 top-0 bottom-0 w-1 bg-gradient-to-b from-brand-400 to-brand-600"></div>
+            <div class="flex items-center gap-2">
+              <span class="inline-flex items-center justify-center w-8 h-8 rounded-xl bg-brand-50 text-brand-600 text-base">📝</span>
+              <span class="text-xs text-slate-500">累计考试</span>
+            </div>
+            <div class="mt-2 flex items-baseline gap-1">
+              <span class="text-2xl font-bold text-slate-800">{{ dashboard.total_exams }}</span>
+              <span class="text-xs text-slate-400 font-medium">次</span>
+            </div>
+            <div class="mt-2 pt-2 border-t border-slate-100 text-[11px] text-slate-400">已有记录的考试场次</div>
+          </div>
+          <div class="bg-slate-50/70 rounded-xl p-4 relative overflow-hidden border border-slate-100">
+            <div class="absolute left-0 top-0 bottom-0 w-1 bg-gradient-to-b from-indigo-400 to-indigo-600"></div>
+            <div class="flex items-center gap-2">
+              <span class="inline-flex items-center justify-center w-8 h-8 rounded-xl bg-indigo-50 text-indigo-600 text-base">📚</span>
+              <span class="text-xs text-slate-500">作业记录</span>
+            </div>
+            <div class="mt-2 flex items-baseline gap-1">
+              <span class="text-2xl font-bold text-slate-800">{{ dashboard.total_homeworks }}</span>
+              <span class="text-xs text-slate-400 font-medium">项</span>
+            </div>
+            <div class="mt-2 pt-2 border-t border-slate-100 text-[11px] text-slate-400">已记录的作业条目</div>
+          </div>
+          <div class="bg-slate-50/70 rounded-xl p-4 relative overflow-hidden border border-slate-100">
+            <div class="absolute left-0 top-0 bottom-0 w-1 bg-gradient-to-b from-amber-400 to-amber-600"></div>
+            <div class="flex items-center gap-2">
+              <span class="inline-flex items-center justify-center w-8 h-8 rounded-xl bg-amber-50 text-amber-600 text-base">🎯</span>
+              <span class="text-xs text-slate-500">薄弱科目</span>
+            </div>
+            <div class="mt-2 flex items-baseline gap-1">
+              <span v-if="dashboard.weak_subjects.length" class="text-base font-semibold text-amber-700 leading-tight">{{ dashboard.weak_subjects.join("、") }}</span>
+              <span v-else class="text-base font-medium text-emerald-600 leading-tight">暂无明显薄弱</span>
+            </div>
+            <div class="mt-2 pt-2 border-t border-slate-100 text-[11px] text-slate-400">建议重点关注</div>
+          </div>
+          <div class="bg-slate-50/70 rounded-xl p-4 relative overflow-hidden border border-slate-100">
+            <div class="absolute left-0 top-0 bottom-0 w-1 bg-gradient-to-b from-emerald-400 to-emerald-600"></div>
+            <div class="flex items-center gap-2">
+              <span class="inline-flex items-center justify-center w-8 h-8 rounded-xl bg-emerald-50 text-emerald-600 text-base">🏅</span>
+              <span class="text-xs text-slate-500">最近考试</span>
+            </div>
+            <div class="mt-2 flex items-baseline gap-1">
+              <span v-if="dashboard.recent_exams[0]" class="text-lg font-semibold text-slate-800 leading-tight">
+                {{ dashboard.recent_exams[0].subject }}
+              </span>
+              <span v-else class="text-base font-medium text-slate-400 leading-tight">暂无</span>
+            </div>
+            <div v-if="dashboard.recent_exams[0]" class="mt-2 pt-2 border-t border-slate-100 text-[11px] text-slate-400">
+              得分率 <span class="font-semibold text-emerald-600">{{ Math.round(dashboard.recent_exams[0].score / dashboard.recent_exams[0].full_score * 100) }}%</span>
+            </div>
+            <div v-else class="mt-2 pt-2 border-t border-slate-100 text-[11px] text-slate-400">去录入第一条考试</div>
+          </div>
+        </div>
+      </div>
+
     <!-- ✏️ 练习汇总（v1.8.0） -->
-    <div v-if="practiceStats.total > 0" class="card p-5">
-      <div class="flex items-center justify-between mb-3 flex-wrap gap-2">
-        <h3 class="font-semibold text-slate-800 flex items-center gap-2">✏️ 练习情况</h3>
+    <div v-if="practiceStats.total > 0" class="card overflow-hidden">
+      <div class="px-4 py-3 border-b border-slate-100 bg-gradient-to-r from-indigo-50/80 to-transparent flex items-center justify-between flex-wrap gap-2">
+        <div class="flex items-center gap-2">
+          <span class="text-indigo-500">✏️</span>
+          <span class="text-sm font-semibold text-slate-800">练习情况</span>
+        </div>
         <button class="btn-ghost text-xs" @click="router.push('/question-banks')">查看题库 →</button>
       </div>
+      <div class="p-4">
 
       <!-- 顶部四联卡：总次数 / 近7天 / 最近得分 / 优秀率 -->
       <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
-        <div class="bg-indigo-50 rounded-xl p-3.5">
-          <div class="text-xs text-indigo-700">总练习次数</div>
-          <div class="text-2xl font-semibold text-indigo-800 mt-1">{{ practiceStats.total }}</div>
-        </div>
-        <div class="bg-slate-50 rounded-xl p-3.5">
-          <div class="text-xs text-slate-500">近 7 天</div>
-          <div class="text-2xl font-semibold text-slate-800 mt-1">{{ practiceStats.recent7Count }}</div>
-          <div class="text-[10px] text-slate-400 mt-0.5">练习次数</div>
-        </div>
-        <div class="bg-slate-50 rounded-xl p-3.5">
-          <div class="text-xs text-slate-500">最近得分</div>
-          <div class="text-2xl font-semibold mt-1" :class="practiceScoreColor(practiceStats.last?.score || 0)">
-            {{ practiceStats.last?.score?.toFixed?.(1) ?? practiceStats.last?.score ?? 0 }}
+        <div class="bg-slate-50/70 rounded-xl p-4 relative overflow-hidden border border-slate-100">
+          <div class="absolute left-0 top-0 bottom-0 w-1 bg-gradient-to-b from-indigo-400 to-indigo-600"></div>
+          <div class="flex items-center gap-2">
+            <span class="inline-flex items-center justify-center w-8 h-8 rounded-xl bg-indigo-50 text-indigo-600 text-base">🏋️</span>
+            <span class="text-xs text-slate-500">总练习次数</span>
           </div>
-          <div class="text-[10px] text-slate-400 mt-0.5 truncate">{{ practiceStats.last?.bank_title || '—' }}</div>
+          <div class="mt-2 flex items-baseline gap-1">
+            <span class="text-2xl font-bold text-indigo-800">{{ practiceStats.total }}</span>
+            <span class="text-xs text-slate-400 font-medium">次</span>
+          </div>
+          <div class="mt-2 pt-2 border-t border-slate-100 text-[11px] text-slate-400">累计提交练习</div>
         </div>
-        <div class="bg-emerald-50 rounded-xl p-3.5">
-          <div class="text-xs text-emerald-700">优秀率 (≥80%)</div>
-          <div class="text-2xl font-semibold text-emerald-800 mt-1">{{ practiceStats.perfectRate }}%</div>
+        <div class="bg-slate-50/70 rounded-xl p-4 relative overflow-hidden border border-slate-100">
+          <div class="absolute left-0 top-0 bottom-0 w-1 bg-gradient-to-b from-sky-400 to-sky-600"></div>
+          <div class="flex items-center gap-2">
+            <span class="inline-flex items-center justify-center w-8 h-8 rounded-xl bg-sky-50 text-sky-600 text-base">🔥</span>
+            <span class="text-xs text-slate-500">近 7 天</span>
+          </div>
+          <div class="mt-2 flex items-baseline gap-1">
+            <span class="text-2xl font-bold text-slate-800">{{ practiceStats.recent7Count }}</span>
+            <span class="text-xs text-slate-400 font-medium">次</span>
+          </div>
+          <div class="mt-2 pt-2 border-t border-slate-100 text-[11px] text-slate-400">本周练习节奏</div>
+        </div>
+        <div class="bg-slate-50/70 rounded-xl p-4 relative overflow-hidden border border-slate-100">
+          <div class="absolute left-0 top-0 bottom-0 w-1 bg-gradient-to-b from-violet-400 to-violet-600"></div>
+          <div class="flex items-center gap-2">
+            <span class="inline-flex items-center justify-center w-8 h-8 rounded-xl bg-violet-50 text-violet-600 text-base">🎯</span>
+            <span class="text-xs text-slate-500">最近得分</span>
+          </div>
+          <div class="mt-2 flex items-baseline gap-1">
+            <span class="text-2xl font-bold" :class="practiceScoreColor(practiceStats.last?.score || 0)">
+              {{ practiceStats.last?.score?.toFixed?.(1) ?? practiceStats.last?.score ?? 0 }}
+            </span>
+            <span class="text-xs text-slate-400 font-medium">分</span>
+          </div>
+          <div class="mt-2 pt-2 border-t border-slate-100 text-[11px] text-slate-400 truncate">{{ practiceStats.last?.bank_title || '—' }}</div>
+        </div>
+        <div class="bg-slate-50/70 rounded-xl p-4 relative overflow-hidden border border-slate-100">
+          <div class="absolute left-0 top-0 bottom-0 w-1 bg-gradient-to-b from-emerald-400 to-emerald-600"></div>
+          <div class="flex items-center gap-2">
+            <span class="inline-flex items-center justify-center w-8 h-8 rounded-xl bg-emerald-50 text-emerald-600 text-base">🌟</span>
+            <span class="text-xs text-slate-500">优秀率 (≥80%)</span>
+          </div>
+          <div class="mt-2 flex items-baseline gap-1">
+            <span class="text-2xl font-bold text-emerald-700">{{ practiceStats.perfectRate }}</span>
+            <span class="text-xs text-slate-400 font-medium">%</span>
+          </div>
+          <div class="mt-2 pt-2 border-t border-slate-100 text-[11px] text-slate-400">达优秀线比例</div>
         </div>
       </div>
 
@@ -373,6 +445,7 @@ watch(
             {{ (e.score ?? 0).toFixed(1) }}
           </span>
         </div>
+      </div>
       </div>
     </div>
 
@@ -560,149 +633,205 @@ watch(
     </div>
 
     <!-- 🏆 学习成就（积分 + 段位 + 称号） -->
-    <div v-if="pointsSummary || ranks.length" class="card p-5">
-      <div class="flex items-center justify-between mb-3">
-        <h3 class="font-semibold text-slate-800 flex items-center gap-2">🏆 学习成就</h3>
+    <div v-if="pointsSummary || ranks.length" class="card overflow-hidden">
+      <div class="px-4 py-3 border-b border-slate-100 bg-gradient-to-r from-amber-50/80 to-transparent flex items-center justify-between flex-wrap gap-2">
+        <div class="flex items-center gap-2">
+          <span class="text-amber-500">🏆</span>
+          <span class="text-sm font-semibold text-slate-800">学习成就</span>
+        </div>
         <button class="btn-ghost text-xs" @click="goRewards">查看详情 →</button>
       </div>
-
-      <!-- 顶部三联卡：总积分 / 已获称号 / 段位数 -->
-      <div class="grid grid-cols-3 gap-3 mb-4">
-        <div class="bg-gradient-to-br from-brand-500 to-brand-700 rounded-lg p-3.5 text-white">
-          <div class="text-xs opacity-90">总积分</div>
-          <div class="text-3xl font-bold mt-0.5 leading-tight">{{ pointsSummary?.total ?? 0 }}</div>
-          <div class="text-[10px] opacity-80 mt-1">获得 {{ pointsSummary?.earned ?? 0 }} · 消费 {{ pointsSummary?.spent ?? 0 }}</div>
-        </div>
-        <div class="bg-amber-50 rounded-lg p-3.5">
-          <div class="text-xs text-amber-700">已获称号</div>
-          <div class="text-3xl font-bold text-amber-800 mt-0.5 leading-tight">{{ earnedAchievements.length }}</div>
-          <div class="text-[10px] text-amber-600 mt-1">继续努力解锁更多</div>
-        </div>
-        <div class="bg-slate-50 rounded-lg p-3.5">
-          <div class="text-xs text-slate-500">科目段位</div>
-          <div class="text-3xl font-bold text-slate-800 mt-0.5 leading-tight">{{ ranks.length }}</div>
-          <div class="text-[10px] text-slate-400 mt-1">按科目独立计算</div>
-        </div>
-      </div>
-
-      <!-- 段位 chips（按科目独立显示，联考王者那种味儿） -->
-      <div v-if="ranks.length" class="mb-3">
-        <div class="text-xs text-slate-500 mb-2">科目段位：</div>
-        <div class="flex flex-wrap gap-2">
-          <div
-            v-for="r in ranks"
-            :key="r.subject"
-            class="flex items-center gap-1.5 px-3 py-1 rounded-lg text-sm font-medium"
-            :style="{
-              backgroundColor: tierColor(r.tier) + '22',
-              color: tierColor(r.tier),
-              border: '1px solid ' + tierColor(r.tier),
-            }"
-          >
-            <span>{{ r.subject }}</span>
-            <span class="opacity-50">·</span>
-            <span class="font-semibold">{{ r.tier }}</span>
-            <span class="text-[10px] opacity-70 ml-1">{{ Math.round(r.avg_score) }}分</span>
+      <div class="p-4">
+        <!-- 顶部三联卡：总积分 / 已获称号 / 段位数 -->
+        <div class="grid grid-cols-3 gap-3 mb-4">
+          <div class="bg-gradient-to-br from-brand-500 to-brand-700 rounded-xl p-3.5 text-white shadow-sm relative overflow-hidden">
+            <span class="absolute -right-2 -top-2 w-14 h-14 rounded-full bg-white/10"></span>
+            <div class="text-xs opacity-90">总积分</div>
+            <div class="text-3xl font-bold mt-0.5 leading-tight">{{ pointsSummary?.total ?? 0 }}</div>
+            <div class="text-[10px] opacity-80 mt-1">获得 {{ pointsSummary?.earned ?? 0 }} · 消费 {{ pointsSummary?.spent ?? 0 }}</div>
+          </div>
+          <div class="bg-slate-50/70 rounded-xl p-3.5 relative overflow-hidden border border-slate-100">
+            <div class="flex items-center gap-2">
+              <span class="inline-flex items-center justify-center w-6 h-6 rounded-lg bg-amber-50 text-amber-500 text-xs">🏅</span>
+              <span class="text-xs text-slate-500">已获称号</span>
+            </div>
+            <div class="text-3xl font-bold text-slate-800 mt-1 leading-tight">{{ earnedAchievements.length }}</div>
+            <div class="text-[10px] text-slate-400 mt-1">继续努力解锁更多</div>
+          </div>
+          <div class="bg-slate-50/70 rounded-xl p-3.5 relative overflow-hidden border border-slate-100">
+            <div class="flex items-center gap-2">
+              <span class="inline-flex items-center justify-center w-6 h-6 rounded-lg bg-violet-50 text-violet-500 text-xs">🥇</span>
+              <span class="text-xs text-slate-500">科目段位</span>
+            </div>
+            <div class="text-3xl font-bold text-slate-800 mt-1 leading-tight">{{ ranks.length }}</div>
+            <div class="text-[10px] text-slate-400 mt-1">按科目独立计算</div>
           </div>
         </div>
-      </div>
 
-      <!-- 最近获得的称号 -->
-      <div v-if="recentAchievements.length">
-        <div class="text-xs text-slate-500 mb-2">最近获得称号：</div>
-        <div class="flex flex-wrap gap-2">
-          <div
-            v-for="a in recentAchievements"
-            :key="a.id"
-            class="px-3 py-1.5 rounded-lg bg-slate-50 flex items-center gap-1.5 border border-slate-200"
-          >
-            <span class="text-sm font-medium text-slate-700">{{ a.name }}</span>
+        <!-- 段位 chips（按科目独立显示，联考王者那种味儿） -->
+        <div v-if="ranks.length" class="mb-3">
+          <div class="text-xs text-slate-500 mb-2">科目段位：</div>
+          <div class="flex flex-wrap gap-2">
+            <div
+              v-for="r in ranks"
+              :key="r.subject"
+              class="flex items-center gap-1.5 px-3 py-1 rounded-lg text-sm font-medium"
+              :style="{
+                backgroundColor: tierColor(r.tier) + '22',
+                color: tierColor(r.tier),
+                border: '1px solid ' + tierColor(r.tier),
+              }"
+            >
+              <span>{{ r.subject }}</span>
+              <span class="opacity-50">·</span>
+              <span class="font-semibold">{{ r.tier }}</span>
+              <span class="text-[10px] opacity-70 ml-1">{{ Math.round(r.avg_score) }}分</span>
+            </div>
           </div>
         </div>
-      </div>
-      <div v-else-if="ranks.length" class="text-sm text-slate-400 text-center py-3 bg-slate-50/60 rounded-lg">
-        还没有获得称号，继续努力解锁第一个吧 🎯
+
+        <!-- 最近获得的称号 -->
+        <div v-if="recentAchievements.length">
+          <div class="text-xs text-slate-500 mb-2">最近获得称号：</div>
+          <div class="flex flex-wrap gap-2">
+            <div
+              v-for="a in recentAchievements"
+              :key="a.id"
+              class="px-3 py-1.5 rounded-lg bg-amber-50/70 flex items-center gap-1.5 border border-amber-100"
+            >
+              <span class="text-sm font-medium text-slate-700">{{ a.name }}</span>
+            </div>
+          </div>
+        </div>
+        <div v-else-if="ranks.length" class="text-sm text-slate-400 text-center py-3 bg-slate-50/60 rounded-lg">
+          还没有获得称号，继续努力解锁第一个吧 🎯
+        </div>
       </div>
     </div>
 
     <!-- 生长发育 -->
-    <div v-if="growthCount" class="card p-5">
-      <div class="flex items-center justify-between mb-3">
-        <h3 class="font-semibold text-slate-800 flex items-center gap-2">📏 生长发育</h3>
+    <div v-if="growthCount" class="card overflow-hidden">
+      <div class="px-4 py-3 border-b border-slate-100 bg-gradient-to-r from-brand-50/70 to-transparent flex items-center justify-between flex-wrap gap-2">
+        <div class="flex items-center gap-2">
+          <span class="text-brand-600">📏</span>
+          <span class="text-sm font-semibold text-slate-800">生长发育</span>
+        </div>
         <button class="btn-ghost text-xs" @click="router.push('/growth')">查看详情 →</button>
       </div>
-      <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
-        <div class="bg-slate-50 rounded-lg p-3">
-          <div class="text-xs text-slate-500">最新身高</div>
-          <div class="text-lg font-semibold text-slate-800 mt-1">{{ latestGrowth?.height_cm ? latestGrowth.height_cm + ' cm' : '-' }}</div>
-        </div>
-        <div class="bg-slate-50 rounded-lg p-3">
-          <div class="text-xs text-slate-500">最新体重</div>
-          <div class="text-lg font-semibold text-slate-800 mt-1">{{ latestGrowth?.weight_kg ? latestGrowth.weight_kg + ' kg' : '-' }}</div>
-        </div>
-        <div class="bg-slate-50 rounded-lg p-3">
-          <div class="text-xs text-slate-500">BMI</div>
-          <div class="text-lg font-semibold text-slate-800 mt-1">{{ latestGrowth?.bmi ?? '-' }}</div>
-        </div>
-        <div class="bg-slate-50 rounded-lg p-3">
-          <div class="text-xs text-slate-500">左眼视力</div>
-          <div class="text-lg font-semibold text-slate-800 mt-1">{{ latestVisionLeft ?? '-' }}</div>
-        </div>
-        <div class="bg-slate-50 rounded-lg p-3">
-          <div class="text-xs text-slate-500">右眼视力</div>
-          <div class="text-lg font-semibold text-slate-800 mt-1">{{ latestVisionRight ?? '-' }}</div>
-        </div>
-        <div class="bg-slate-50 rounded-lg p-3">
-          <div class="text-xs text-slate-500">记录次数</div>
-          <div class="text-lg font-semibold text-slate-800 mt-1">{{ growthCount }} 次</div>
+      <div class="p-4">
+        <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+          <div class="bg-slate-50/70 rounded-xl p-3 relative overflow-hidden border border-slate-100">
+            <div class="flex items-center gap-2">
+              <span class="inline-flex items-center justify-center w-7 h-7 rounded-lg bg-brand-50 text-brand-600 text-sm">📏</span>
+              <span class="text-[11px] text-slate-500">最新身高</span>
+            </div>
+            <div class="mt-1.5 text-lg font-bold text-slate-800">{{ latestGrowth?.height_cm ? latestGrowth.height_cm + ' cm' : '-' }}</div>
+          </div>
+          <div class="bg-slate-50/70 rounded-xl p-3 relative overflow-hidden border border-slate-100">
+            <div class="flex items-center gap-2">
+              <span class="inline-flex items-center justify-center w-7 h-7 rounded-lg bg-emerald-50 text-emerald-600 text-sm">⚖️</span>
+              <span class="text-[11px] text-slate-500">最新体重</span>
+            </div>
+            <div class="mt-1.5 text-lg font-bold text-slate-800">{{ latestGrowth?.weight_kg ? latestGrowth.weight_kg + ' kg' : '-' }}</div>
+          </div>
+          <div class="bg-slate-50/70 rounded-xl p-3 relative overflow-hidden border border-slate-100">
+            <div class="flex items-center gap-2">
+              <span class="inline-flex items-center justify-center w-7 h-7 rounded-lg bg-violet-50 text-violet-600 text-sm">🧮</span>
+              <span class="text-[11px] text-slate-500">BMI</span>
+            </div>
+            <div class="mt-1.5 text-lg font-bold text-slate-800">{{ latestGrowth?.bmi ?? '-' }}</div>
+          </div>
+          <div class="bg-slate-50/70 rounded-xl p-3 relative overflow-hidden border border-slate-100">
+            <div class="flex items-center gap-2">
+              <span class="inline-flex items-center justify-center w-7 h-7 rounded-lg bg-sky-50 text-sky-600 text-sm">👁️</span>
+              <span class="text-[11px] text-slate-500">左眼视力</span>
+            </div>
+            <div class="mt-1.5 text-lg font-bold text-slate-800">{{ latestVisionLeft ?? '-' }}</div>
+          </div>
+          <div class="bg-slate-50/70 rounded-xl p-3 relative overflow-hidden border border-slate-100">
+            <div class="flex items-center gap-2">
+              <span class="inline-flex items-center justify-center w-7 h-7 rounded-lg bg-teal-50 text-teal-600 text-sm">👁️</span>
+              <span class="text-[11px] text-slate-500">右眼视力</span>
+            </div>
+            <div class="mt-1.5 text-lg font-bold text-slate-800">{{ latestVisionRight ?? '-' }}</div>
+          </div>
+          <div class="bg-slate-50/70 rounded-xl p-3 relative overflow-hidden border border-slate-100">
+            <div class="flex items-center gap-2">
+              <span class="inline-flex items-center justify-center w-7 h-7 rounded-lg bg-amber-50 text-amber-600 text-sm">🗓️</span>
+              <span class="text-[11px] text-slate-500">记录次数</span>
+            </div>
+            <div class="mt-1.5 text-lg font-bold text-slate-800">{{ growthCount }} <span class="text-xs font-medium text-slate-400">次</span></div>
+          </div>
         </div>
       </div>
     </div>
 
     <!-- 社交情感 -->
-    <div v-if="socialCount" class="card p-5">
-      <div class="flex items-center justify-between mb-3">
-        <h3 class="font-semibold text-slate-800 flex items-center gap-2">💭 社交情感</h3>
+    <div v-if="socialCount" class="card overflow-hidden">
+      <div class="px-4 py-3 border-b border-slate-100 bg-gradient-to-r from-brand-50/70 to-transparent flex items-center justify-between flex-wrap gap-2">
+        <div class="flex items-center gap-2">
+          <span class="text-brand-600">💭</span>
+          <span class="text-sm font-semibold text-slate-800">社交情感</span>
+        </div>
         <button class="btn-ghost text-xs" @click="router.push('/social-emotional')">查看详情 →</button>
       </div>
-      <div class="grid grid-cols-2 md:grid-cols-3 gap-3">
-        <div class="bg-slate-50 rounded-lg p-3">
-          <div class="text-xs text-slate-500">当前情绪</div>
-          <div class="text-2xl mt-1">{{ moodEmoji(latestSocial?.mood_score) }}</div>
-          <div class="text-xs text-slate-400">{{ latestSocial?.mood_score ? latestSocial.mood_score + '/5' : '-' }}</div>
-        </div>
-        <div class="bg-slate-50 rounded-lg p-3">
-          <div class="text-xs text-slate-500">自信心</div>
-          <div class="text-lg font-semibold text-slate-800 mt-1">{{ latestSocial?.confidence_level ? latestSocial.confidence_level + '/5' : '-' }}</div>
-        </div>
-        <div class="bg-slate-50 rounded-lg p-3">
-          <div class="text-xs text-slate-500">最近情绪标签</div>
-          <div class="flex flex-wrap gap-1 mt-1">
-            <span v-for="tag in (latestSocial?.emotion_tags || [])" :key="tag" class="text-[10px] px-1.5 py-0.5 rounded bg-brand-50 text-brand-700">{{ tag }}</span>
-            <span v-if="!latestSocial?.emotion_tags?.length" class="text-xs text-slate-400">-</span>
+      <div class="p-4">
+        <div class="grid grid-cols-2 md:grid-cols-3 gap-3">
+          <div class="bg-slate-50/70 rounded-xl p-3.5 relative overflow-hidden border border-slate-100">
+            <div class="flex items-center gap-2">
+              <span class="inline-flex items-center justify-center w-7 h-7 rounded-lg bg-rose-50 text-rose-500 text-sm">😊</span>
+              <span class="text-[11px] text-slate-500">当前情绪</span>
+            </div>
+            <div class="mt-1.5 flex items-center gap-1.5">
+              <span class="text-2xl">{{ moodEmoji(latestSocial?.mood_score) }}</span>
+              <span class="text-xs text-slate-400">{{ latestSocial?.mood_score ? latestSocial.mood_score + '/5' : '-' }}</span>
+            </div>
+          </div>
+          <div class="bg-slate-50/70 rounded-xl p-3.5 relative overflow-hidden border border-slate-100">
+            <div class="flex items-center gap-2">
+              <span class="inline-flex items-center justify-center w-7 h-7 rounded-lg bg-indigo-50 text-indigo-500 text-sm">💪</span>
+              <span class="text-[11px] text-slate-500">自信心</span>
+            </div>
+            <div class="mt-1.5 text-lg font-bold text-slate-800">{{ latestSocial?.confidence_level ? latestSocial.confidence_level + '/5' : '-' }}</div>
+          </div>
+          <div class="bg-slate-50/70 rounded-xl p-3.5 relative overflow-hidden border border-slate-100">
+            <div class="flex items-center gap-2">
+              <span class="inline-flex items-center justify-center w-7 h-7 rounded-lg bg-brand-50 text-brand-600 text-sm">🏷️</span>
+              <span class="text-[11px] text-slate-500">最近情绪标签</span>
+            </div>
+            <div class="flex flex-wrap gap-1 mt-1.5">
+              <span v-for="tag in (latestSocial?.emotion_tags || [])" :key="tag" class="text-[10px] px-1.5 py-0.5 rounded bg-brand-50 text-brand-700">{{ tag }}</span>
+              <span v-if="!latestSocial?.emotion_tags?.length" class="text-xs text-slate-400">-</span>
+            </div>
           </div>
         </div>
       </div>
     </div>
 
     <!-- 兴趣特长 -->
-    <div v-if="interestCount" class="card p-5">
-      <div class="flex items-center justify-between mb-3">
-        <h3 class="font-semibold text-slate-800 flex items-center gap-2">🎨 兴趣特长</h3>
+    <div v-if="interestCount" class="card overflow-hidden">
+      <div class="px-4 py-3 border-b border-slate-100 bg-gradient-to-r from-brand-50/70 to-transparent flex items-center justify-between flex-wrap gap-2">
+        <div class="flex items-center gap-2">
+          <span class="text-brand-600">🎨</span>
+          <span class="text-sm font-semibold text-slate-800">兴趣特长</span>
+        </div>
         <button class="btn-ghost text-xs" @click="router.push('/interests')">查看详情 →</button>
       </div>
-      <div class="flex flex-wrap gap-2 mb-3">
-        <span v-for="t in interestTypes" :key="t" class="text-xs px-2 py-1 rounded-lg bg-brand-50 text-brand-700">{{ t }}</span>
-      </div>
-      <div class="space-y-2">
-        <div v-for="r in latestInterests" :key="r.id" class="flex items-center justify-between p-2.5 rounded-lg bg-slate-50/60">
-          <div>
-            <span class="text-sm font-medium text-slate-700">{{ r.activity_name }}</span>
-            <span class="text-xs text-slate-400 ml-2">{{ r.record_date }}</span>
+      <div class="p-4">
+        <div class="flex flex-wrap gap-2 mb-3">
+          <span v-for="t in interestTypes" :key="t" class="text-xs px-2 py-1 rounded-lg bg-brand-50 text-brand-700">{{ t }}</span>
+        </div>
+        <div class="space-y-2">
+          <div v-for="r in latestInterests" :key="r.id" class="flex items-center justify-between p-2.5 rounded-lg bg-slate-50/60 border border-slate-100/70">
+            <div>
+              <span class="text-sm font-medium text-slate-700">{{ r.activity_name }}</span>
+              <span class="text-xs text-slate-400 ml-2">{{ r.record_date }}</span>
+            </div>
+            <span class="text-[10px] px-1.5 py-0.5 rounded bg-brand-50 text-brand-600">{{ r.skill_level }}</span>
           </div>
-          <span class="text-[10px] px-1.5 py-0.5 rounded bg-brand-50 text-brand-600">{{ r.skill_level }}</span>
         </div>
       </div>
     </div>
   </div>
+</div>
 </template>
