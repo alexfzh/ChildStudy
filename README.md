@@ -553,11 +553,11 @@ ALLOWED_ORIGINS=http://localhost:5173,http://127.0.0.1:5173,http://localhost:800
 
 ## 🗺️ 路线图
 
-- [x] ~~多用户家庭账号（父母/祖父母权限）~~ → v1.6.0 已上线
-- [ ] 教材 Reading Comprehension 专项题自动生成
-- [ ] 教材 Sound/Phonics 拼读专项题
-- [ ] 错题推荐对接新知识点体系
-- [ ] 学情周报/月报 PDF 导出
+- [x] ~~多用户家庭账号（父母/祖父母权限）~~ → v1.6.0 已上线（注：角色为 parent/child，祖父母按 parent 角色使用，无独立细分权限）
+- [x] ~~教材 Reading Comprehension 专项题自动生成~~ → v1.7.0 已上线（沪教版英语 2026 版 U1-U10，每单元 6 题，seed 生成）
+- [ ] 教材 Sound/Phonics 拼读专项题（已覆盖 U1/U2/U6/U7/U9 共 76 题，其余单元待补）
+- [x] ~~错题推荐对接新知识点体系~~ → v1.7.0 已上线（primary / 同单元拓展 / 名称兜底三层去重）
+- [x] ~~学情周报/月报 PDF 导出~~ → v1.7.0 已上线（reportlab 渲染，存 reports/{child_id}/{id}.pdf）
 - [ ] 移动端 PWA 适配
 
 ## 🐛 常见问题
