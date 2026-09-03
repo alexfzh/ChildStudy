@@ -37,7 +37,7 @@ export function assessBMI(bmi, gender, ageMonths) {
   const g = (gender || "male").toLowerCase();
   if (ageMonths <= 83) {
     // 0-83 月: WS/T 423-2022 百分位法
-    const row = _STANDARDS?.bmi_0_83_months?.[g]?.[String(ageMonths)];
+    const row = _standardsCache?.bmi_0_83_months?.[g]?.[String(ageMonths)];
     if (!row) return { category: "unknown", label: "-", color: "default", source: "-" };
     const [p3, p15, p50, p85, p97] = row;
     if (bmi < p3) return { category: "thin", label: "偏瘦", color: "info", source: "WS/T 423-2022（百分位法）" };
@@ -52,7 +52,7 @@ export function assessBMI(bmi, gender, ageMonths) {
   }
   // 6-18 岁: WS/T 586-2018
   const ageStr = String(Math.round((ageMonths / 12) * 2) / 2);
-  const cutoffs = _STANDARDS?.bmi_cutoffs_6_18?.[g]?.[ageStr];
+  const cutoffs = _standardsCache?.bmi_cutoffs_6_18?.[g]?.[ageStr];
   if (!cutoffs) {
     return { category: "unknown", label: "-", color: "default", source: "-" };
   }

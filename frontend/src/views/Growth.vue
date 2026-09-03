@@ -8,13 +8,16 @@ import * as growthUtil from "@/utils/growth";
 const childStore = useChildStore();
 const childId = computed(() => childStore.current?.id);
 const childBirthDate = computed(() => childStore.current?.birth_date);
+const childGender = computed(() => (childStore.current?.gender || "male").toLowerCase());
 
 const loading = ref(false);
 const records = ref([]);
 const standards = ref(null);
 
-// ---------- BMI card ----------
+// ---------- 最新数据 ----------
 const latestRecord = computed(() => records.value[0] || null);
+const latestHeight = computed(() => latestRecord.value?.height_cm ?? null);
+const latestWeight = computed(() => latestRecord.value?.weight_kg ?? null);
 const latestBMI = computed(() => {
   if (!latestRecord.value) return null;
   return latestRecord.value.bmi ?? growthUtil.computeBMI(latestRecord.value.height_cm, latestRecord.value.weight_kg);
@@ -27,11 +30,7 @@ const ageMonths = computed(() => {
   return (rd.getFullYear() - bd.getFullYear()) * 12 + (rd.getMonth() - bd.getMonth());
 });
 
-const bmiAssessment = computed(() => {
-  const gender = childStore.current?.gender || "male";
-  return growthUtil.assessBMI(latestBMI.value, gender, ageMonths.value);
-});
-
+const bmiAssessment = computed(() => growthUtil.assessBMI(latestBMI.value, childGender.value, ageMonths.value));
 const bmiColorClass = computed(() => {
   const map = {
     normal: "text-emerald-600 bg-emerald-50",
@@ -39,9 +38,174 @@ const bmiColorClass = computed(() => {
     obese: "text-red-600 bg-red-50",
     unknown: "text-slate-400 bg-slate-50",
     approximate: "text-indigo-600 bg-indigo-50",
+    thin: "text-sky-600 bg-sky-50",
   };
   return map[bmiAssessment.value.category] || "text-slate-400 bg-slate-50";
 });
+
+// ---------- 标准 lookup ----------
+function lookupStdRow(metric, months) {
+  if (!standards.value || months == null) return null;
+  const g = childGender.value;
+  if (months <= 83) {
+    const table = standards.value[metric === "height" ? "height_0_83_months" : "weight_0_83_months"];
+    return table?.[g]?.[String(months)] || null;
+  } else {
+    const yr = months / 12;
+    const table = standards.value[metric === "height" ? "height_7_18_years" : "weight_7_18_years"];
+    if (!table?.[g]) return null;
+    const years = Object.keys(table[g]).map(Number).sort((a, b) => a - b);
+    const nearest = years.reduce((prev, curr) => Math.abs(curr - yr) < Math.abs(prev - yr) ? curr : prev);
+    return table[g][nearest] || null;
+  }
+}
+
+function heightStdRow(months) {
+  const row = lookupStdRow("height", months);
+  if (!row) return null;
+  return row.length >= 5
+    ? { p3: row[0], p15: row[1], p50: row[2], p85: row[3], p97: row[4] }
+    : { p3: row[0], p50: row[1], p97: row[2] };
+}
+
+function weightStdRow(months) {
+  const row = lookupStdRow("weight", months);
+  if (!row) return null;
+  return row.length >= 5
+    ? { p3: row[0], p15: row[1], p50: row[2], p85: row[3], p97: row[4] }
+    : { p3: row[0], p50: row[1], p97: row[2] };
+}
+
+function categoryByRange(value, std) {
+  if (!std || value == null) return { label: "-", color: "default" };
+  const hasFive = std.p15 != null;
+  const p3 = std.p3;
+  const p97 = std.p97;
+  const p50 = std.p50;
+  if (value < p3) return { label: "下（<P3）", color: "info" };
+  if (hasFive && value < std.p15) return { label: "中下", color: "slate" };
+  if (value < p50) return { label: "中下", color: "slate" };
+  if (value <= p50) return { label: "中位数", color: "success" };
+  if (hasFive && value <= std.p85) return { label: "中上", color: "success" };
+  if (value <= p97) return { label: "中上", color: "success" };
+  return { label: "上（≥P97）", color: "warning" };
+}
+
+function ageDisplay(months) {
+  if (months == null) return "-";
+  const yr = Math.floor(months / 12);
+  const mo = months % 12;
+  if (yr === 0) return `${mo} 月`;
+  if (mo === 0) return `${yr} 岁`;
+  return `${yr} 岁 ${mo} 月`;
+}
+
+// ---------- 最新记录的标准值（用于顶部卡片） ----------
+const heightStandard = computed(() => {
+  const am = ageMonths.value;
+  if (am == null) return null;
+  return heightStdRow(am);
+});
+
+const weightStandard = computed(() => {
+  const am = ageMonths.value;
+  if (am == null) return null;
+  return weightStdRow(am);
+});
+
+const heightVsStd = computed(() => {
+  if (!latestHeight.value || !heightStandard.value) return null;
+  return categoryByRange(latestHeight.value, heightStandard.value);
+});
+
+const weightVsStd = computed(() => {
+  if (!latestWeight.value || !weightStandard.value) return null;
+  return categoryByRange(latestWeight.value, weightStandard.value);
+});
+
+// ---------- 详细对比总表（核心） ----------
+const enrichedRecords = computed(() => {
+  if (!records.value.length || !standards.value) return records.value;
+  const bd = childBirthDate.value ? new Date(childBirthDate.value) : null;
+  const g = childGender.value;
+  return records.value.map(r => {
+    const rd = new Date(r.record_date);
+    const months = bd ? (rd.getFullYear() - bd.getFullYear()) * 12 + (rd.getMonth() - bd.getMonth()) : null;
+    const hStd = heightStdRow(months);
+    const wStd = weightStdRow(months);
+    const bmi = r.bmi ?? growthUtil.computeBMI(r.height_cm, r.weight_kg);
+    const bmiAssess = growthUtil.assessBMI(bmi, g, months);
+    const hCat = hStd ? categoryByRange(r.height_cm, hStd) : null;
+    const wCat = wStd ? categoryByRange(r.weight_kg, wStd) : null;
+    return {
+      ...r,
+      ageMonths: months,
+      ageLabel: ageDisplay(months),
+      heightStd: hStd,
+      weightStd: wStd,
+      bmi,
+      bmiAssessment: bmiAssess,
+      heightCategory: hCat,
+      weightCategory: wCat,
+    };
+  }).sort((a, b) => {
+    const am = (b.ageMonths ?? 0) - (a.ageMonths ?? 0);
+    if (am !== 0) return am;
+    return new Date(b.record_date) - new Date(a.record_date);
+  });
+});
+
+// ---------- 整岁对照表 ----------
+const yearlyStandards = computed(() => {
+  if (!standards.value) return [];
+  const g = childGender.value;
+  const out = [];
+  const h0 = standards.value.height_0_83_months?.[g] || {};
+  const w0 = standards.value.weight_0_83_months?.[g] || {};
+  const infantMonths = [0, 12, 24, 36, 48, 60, 72, 84];
+  for (const m of infantMonths) {
+    if (h0[m]) {
+      out.push({ label: m === 0 ? "出生" : `${m / 12} 岁`, months: m, height: h0[m], weight: w0[m], source: "WS/T 423" });
+    }
+  }
+  const h7 = standards.value.height_7_18_years?.[g] || {};
+  const w7 = standards.value.weight_7_18_years?.[g] || {};
+  for (let y = 7; y <= 18; y++) {
+    if (h7[y]) {
+      out.push({ label: `${y} 岁`, months: y * 12, height: h7[y], weight: w7[y], source: "WS/T 611" });
+    }
+  }
+  return out;
+});
+
+const currentMonthIndex = computed(() => {
+  const am = ageMonths.value;
+  if (am == null) return -1;
+  return yearlyStandards.value.findIndex((r) => r.months === am);
+});
+
+const pickedAge = ref(null);
+const pickedAgeLabel = computed(() => {
+  if (pickedAge.value == null) return null;
+  return ageDisplay(pickedAge.value);
+});
+const pickedHeightStd = computed(() => {
+  if (pickedAge.value == null) return null;
+  const row = heightStdRow(pickedAge.value);
+  return row ? (row.length >= 5
+    ? { p3: row[0], p15: row[1], p50: row[2], p85: row[3], p97: row[4] }
+    : { p3: row[0], p50: row[1], p97: row[2] }) : null;
+});
+const pickedWeightStd = computed(() => {
+  if (pickedAge.value == null) return null;
+  const row = weightStdRow(pickedAge.value);
+  return row ? (row.length >= 5
+    ? { p3: row[0], p15: row[1], p50: row[2], p85: row[3], p97: row[4] }
+    : { p3: row[0], p50: row[1], p97: row[2] }) : null;
+});
+function onPickAge(months) {
+  pickedAge.value = months;
+}
 
 // ---------- Charts ----------
 const chartRefHeight = ref(null);
@@ -112,12 +276,7 @@ function buildChartOption(seriesData, bands, title, unit) {
 
 function renderCharts() {
   if (!standards.value || !records.value.length) return;
-
-  const child = childStore.current;
-  const gender = (child?.gender || "male").toLowerCase();
-  const bd = child?.birth_date ? new Date(child.birth_date) : null;
-
-  // Compute age in months for each record
+  const bd = childBirthDate.value ? new Date(childBirthDate.value) : null;
   const points = records.value
     .map((r) => {
       if (!bd || !r.record_date) return null;
@@ -129,14 +288,11 @@ function renderCharts() {
     .sort((a, b) => a.months - b.months);
 
   if (!points.length) return;
-
   const maxMonth = Math.max(...points.map((p) => p.months), 6);
 
-  // Build bands from standards
   function getBand(month, metric) {
-    const table = standards.value[metric]?.[gender];
+    const table = standards.value[metric]?.[childGender.value];
     if (!table) return null;
-    // Find nearest month
     const keys = Object.keys(table).map(Number).sort((a, b) => a - b);
     const nearest = keys.reduce((prev, curr) => (Math.abs(curr - month) < Math.abs(prev - month) ? curr : prev));
     return table[nearest] || null;
@@ -159,7 +315,6 @@ function renderCharts() {
     });
   }
 
-  // Re-group bands by name
   const groupBands = (raw, names) => {
     const result = [];
     names.forEach((name, idx) => {
@@ -178,17 +333,11 @@ function renderCharts() {
 
   if (chartRefHeight.value && window.echarts) {
     const hChart = window.echarts.init(chartRefHeight.value);
-    hChart.setOption(
-      buildChartOption(hSeries, groupBands(heightBands, ["P97", "P50", "P3"]), "身高曲线", "cm"),
-      true
-    );
+    hChart.setOption(buildChartOption(hSeries, groupBands(heightBands, ["P97", "P50", "P3"]), "身高曲线", "cm"), true);
   }
   if (chartRefWeight.value && window.echarts) {
     const wChart = window.echarts.init(chartRefWeight.value);
-    wChart.setOption(
-      buildChartOption(wSeries, groupBands(weightBands, ["P97", "P50", "P3"]), "体重曲线", "kg"),
-      true
-    );
+    wChart.setOption(buildChartOption(wSeries, groupBands(weightBands, ["P97", "P50", "P3"]), "体重曲线", "kg"), true);
   }
 }
 
@@ -204,7 +353,6 @@ async function fetchData() {
     records.value = listRes;
     standards.value = stdRes;
     if (stdRes) growthUtil.setStandards(stdRes);
-    // Render charts after data + standards loaded
     setTimeout(renderCharts, 100);
   } catch (e) {
     ElMessage.error("加载生长发育数据失败");
@@ -284,158 +432,27 @@ const remove = async (r) => {
 };
 
 // ---------- Helpers ----------
-const latestRecords = computed(() => [...records.value].slice(0, 5));
-const latestHeight = computed(() => latestRecords.value[0]?.height_cm);
-const latestWeight = computed(() => latestRecords.value[0]?.weight_kg);
-
-// ---------- 标准对照 (按月龄) ----------
-function lookupStdRow(metric, gender, months) {
-  // 0-83 月走 height_0_83_months, 7-18 岁走 height_7_18_years
-  if (!standards.value || months == null) return null;
-  const g = (gender || "male").toLowerCase();
-  if (months <= 83) {
-    const table = standards.value[metric === "height" ? "height_0_83_months" : "weight_0_83_months"];
-    return table?.[g]?.[String(months)] || null;
-  } else {
-    const yr = months / 12;
-    const table = standards.value[metric === "height" ? "height_7_18_years" : "weight_7_18_years"];
-    // 找最接近的整岁
-    if (!table?.[g]) return null;
-    const years = Object.keys(table[g]).map(Number).sort((a, b) => a - b);
-    const nearest = years.reduce((prev, curr) => Math.abs(curr - yr) < Math.abs(prev - yr) ? curr : prev);
-    return table[g][nearest] || null;
-  }
+function stdTooltip(std, unit) {
+  if (!std) return "";
+  const parts = [];
+  if (std.p3 != null) parts.push(`P3 ${std.p3}${unit}`);
+  if (std.p15 != null) parts.push(`P15 ${std.p15}${unit}`);
+  if (std.p50 != null) parts.push(`P50 ${std.p50}${unit}`);
+  if (std.p85 != null) parts.push(`P85 ${std.p85}${unit}`);
+  if (std.p97 != null) parts.push(`P97 ${std.p97}${unit}`);
+  return parts.join("\n");
 }
 
-function heightStdRow(ageMonths) {
-  return lookupStdRow("height", childStore.current?.gender, ageMonths);
-}
-
-function weightStdRow(ageMonths) {
-  return lookupStdRow("weight", childStore.current?.gender, ageMonths);
-}
-
-const heightStandard = computed(() => {
-  const am = ageMonths.value;
-  if (am == null) return null;
-  const row = heightStdRow(am);
-  if (!row) return null;
-  // height_0_83_months 是 [P3, P15, P50, P85, P97] 五档, height_7_18_years 是 [P3, P50, P97] 三档
-  return row.length >= 5
-    ? { p3: row[0], p15: row[1], p50: row[2], p85: row[3], p97: row[4] }
-    : { p3: row[0], p50: row[1], p97: row[2] };
-});
-
-const weightStandard = computed(() => {
-  const am = ageMonths.value;
-  if (am == null) return null;
-  const row = weightStdRow(am);
-  if (!row) return null;
-  return row.length >= 5
-    ? { p3: row[0], p15: row[1], p50: row[2], p85: row[3], p97: row[4] }
-    : { p3: row[0], p50: row[1], p97: row[2] };
-});
-
-function ageDisplay(months) {
-  if (months == null) return "-";
-  const yr = Math.floor(months / 12);
-  const mo = months % 12;
-  if (yr === 0) return `${mo} 月`;
-  if (mo === 0) return `${yr} 岁`;
-  return `${yr} 岁 ${mo} 月`;
-}
-
-function categoryByRange(value, std) {
-  if (!std || value == null) return { label: "-", color: "default" };
-  // 7-18 岁 只有 P3/P50/P97 三档
-  const hasFive = std.p15 != null;
-  const p3 = std.p3;
-  const p97 = std.p97;
-  const p50 = std.p50;
-  if (value < p3) return { label: "下（<P3）", color: "info" };
-  if (hasFive && value < std.p15) return { label: "中下", color: "slate" };
-  if (value < p50) return { label: "中下", color: "slate" };
-  if (value <= p50) return { label: "中位数", color: "success" };
-  if (hasFive && value <= std.p85) return { label: "中上", color: "success" };
-  if (value <= p97) return { label: "中上", color: "success" };
-  return { label: "上（≥P97）", color: "warning" };
-}
-
-const heightVsStd = computed(() => {
-  if (!latestHeight.value || !heightStandard.value) return null;
-  return categoryByRange(latestHeight.value, heightStandard.value);
-});
-
-const weightVsStd = computed(() => {
-  if (!latestWeight.value || !weightStandard.value) return null;
-  return categoryByRange(latestWeight.value, weightStandard.value);
-});
-
-// ---------- 整岁对照表 ----------
-const yearlyStandards = computed(() => {
-  if (!standards.value) return [];
-  const g = (childStore.current?.gender || "male").toLowerCase();
-  const out = [];
-  // 0-7 岁 (整月龄: 0/12/24/36/48/60/72/84)
-  const h0 = standards.value.height_0_83_months?.[g] || {};
-  const w0 = standards.value.weight_0_83_months?.[g] || {};
-  const infantMonths = [0, 12, 24, 36, 48, 60, 72, 84];
-  for (const m of infantMonths) {
-    if (h0[m]) {
-      out.push({
-        label: m === 0 ? "出生" : `${m / 12} 岁`,
-        months: m,
-        height: h0[m],
-        weight: w0[m],
-        source: "WS/T 423",
-      });
-    }
-  }
-  // 7-18 岁 (整岁)
-  const h7 = standards.value.height_7_18_years?.[g] || {};
-  const w7 = standards.value.weight_7_18_years?.[g] || {};
-  for (let y = 7; y <= 18; y++) {
-    if (h7[y]) {
-      out.push({
-        label: `${y} 岁`,
-        months: y * 12,
-        height: h7[y], // [P3, P50, P97]
-        weight: w7[y],
-        source: "WS/T 611",
-      });
-    }
-  }
-  return out;
-});
-
-const currentMonthIndex = computed(() => {
-  const am = ageMonths.value;
-  if (am == null) return -1;
-  return yearlyStandards.value.findIndex((r) => r.months === am);
-});
-
-// 点表格中任意行 → 设 pickedAge → 卡片显示该年龄的标准值
-const pickedAge = ref(null);
-const pickedAgeLabel = computed(() => {
-  if (pickedAge.value == null) return null;
-  return ageDisplay(pickedAge.value);
-});
-const pickedHeightStd = computed(() => {
-  if (pickedAge.value == null) return null;
-  const row = heightStdRow(pickedAge.value);
-  return row ? (row.length >= 5
-    ? { p3: row[0], p15: row[1], p50: row[2], p85: row[3], p97: row[4] }
-    : { p3: row[0], p50: row[1], p97: row[2] }) : null;
-});
-const pickedWeightStd = computed(() => {
-  if (pickedAge.value == null) return null;
-  const row = weightStdRow(pickedAge.value);
-  return row ? (row.length >= 5
-    ? { p3: row[0], p15: row[1], p50: row[2], p85: row[3], p97: row[4] }
-    : { p3: row[0], p50: row[1], p97: row[2] }) : null;
-});
-function onPickAge(months) {
-  pickedAge.value = months;
+function tagClass(color) {
+  const map = {
+    info: "bg-sky-50 text-sky-600",
+    slate: "bg-slate-100 text-slate-700",
+    success: "bg-emerald-50 text-emerald-700",
+    warning: "bg-amber-50 text-amber-700",
+    default: "text-slate-400",
+    danger: "bg-red-50 text-red-700",
+  };
+  return map[color] || "text-slate-400";
 }
 </script>
 
@@ -460,12 +477,7 @@ function onPickAge(months) {
             P3 <span class="font-mono">{{ heightStandard.p3 }}</span> · P50 <span class="font-mono">{{ heightStandard.p50 }}</span> · P97 <span class="font-mono">{{ heightStandard.p97 }}</span>
           </div>
           <div v-if="heightVsStd" class="mt-1">
-            <span class="text-xs px-2 py-0.5 rounded-full" :class="{
-              'bg-sky-50 text-sky-600': heightVsStd.color === 'info',
-              'bg-slate-100 text-slate-700': heightVsStd.color === 'slate',
-              'bg-emerald-50 text-emerald-700': heightVsStd.color === 'success',
-              'bg-amber-50 text-amber-700': heightVsStd.color === 'warning',
-            }">{{ heightVsStd.label }}</span>
+            <span class="text-xs px-2 py-0.5 rounded-full" :class="tagClass(heightVsStd.color)">{{ heightVsStd.label }}</span>
           </div>
         </div>
       </div>
@@ -478,18 +490,18 @@ function onPickAge(months) {
             P3 <span class="font-mono">{{ weightStandard.p3 }}</span> · P50 <span class="font-mono">{{ weightStandard.p50 }}</span> · P97 <span class="font-mono">{{ weightStandard.p97 }}</span>
           </div>
           <div v-if="weightVsStd" class="mt-1">
-            <span class="text-xs px-2 py-0.5 rounded-full" :class="{
-              'bg-sky-50 text-sky-600': weightVsStd.color === 'info',
-              'bg-slate-100 text-slate-700': weightVsStd.color === 'slate',
-              'bg-emerald-50 text-emerald-700': weightVsStd.color === 'success',
-              'bg-amber-50 text-amber-700': weightVsStd.color === 'warning',
-            }">{{ weightVsStd.label }}</span>
+            <span class="text-xs px-2 py-0.5 rounded-full" :class="tagClass(weightVsStd.color)">{{ weightVsStd.label }}</span>
           </div>
         </div>
       </div>
       <div class="card p-4">
         <div class="text-xs text-slate-500">BMI</div>
         <div class="text-2xl font-semibold text-slate-800 mt-1">{{ latestBMI ?? '-' }}</div>
+        <div v-if="latestBMI" class="mt-2">
+          <span class="text-xs px-2 py-0.5 rounded-full" :class="bmiColorClass.split(' ')[0] + ' ' + bmiColorClass.split(' ')[1]">
+            {{ bmiAssessment.label }}
+          </span>
+        </div>
       </div>
       <div class="card p-4">
         <div class="text-xs text-slate-500">记录次数</div>
@@ -497,32 +509,147 @@ function onPickAge(months) {
       </div>
     </div>
 
-    <!-- BMI 状态卡 -->
-    <div v-if="latestRecord" class="card p-5 mb-5">
-      <div class="flex items-start gap-4 flex-wrap">
-        <div class="flex-1 min-w-[200px]">
-          <div class="text-xs text-slate-500 mb-1">BMI 指数评估</div>
-          <div class="flex items-baseline gap-3 mb-2">
-            <span class="text-4xl font-bold" :class="bmiColorClass.split(' ')[0]">{{ latestBMI ?? '-' }}</span>
-            <span
-              class="px-3 py-1 rounded-full text-sm font-medium"
-              :class="bmiColorClass"
-            >
-              {{ bmiAssessment.label }}
+    <!-- 核心区域：生长发育详细对比总表 -->
+    <div v-if="enrichedRecords.length" class="card p-4 mb-5">
+      <div class="flex items-center justify-between mb-3 flex-wrap gap-2">
+        <div>
+          <div class="text-sm font-semibold text-slate-800">生长发育详细对比总表</div>
+          <div class="text-xs text-slate-500 mt-0.5">
+            {{ (childStore.current?.gender || 'male') === 'male' ? '男童' : '女童' }} · 每次记录均对照中国儿童生长标准
+          </div>
+        </div>
+      </div>
+      <div class="overflow-x-auto">
+        <table class="w-full text-sm">
+          <thead>
+            <tr class="border-b border-slate-100">
+              <th class="text-left py-2 px-3 text-slate-500 font-medium">日期</th>
+              <th class="text-left py-2 px-3 text-slate-500 font-medium">年龄</th>
+              <th class="text-right py-2 px-3 text-slate-500 font-medium" colspan="3">身高 (cm)</th>
+              <th class="text-right py-2 px-3 text-slate-500 font-medium" colspan="3">体重 (kg)</th>
+              <th class="text-right py-2 px-3 text-slate-500 font-medium">BMI</th>
+              <th class="text-left py-2 px-3 text-slate-500 font-medium">等级</th>
+              <th class="text-left py-2 px-3 text-slate-500 font-medium">视力</th>
+              <th class="text-left py-2 px-3 text-slate-500 font-medium">备注</th>
+              <th class="text-right py-2 px-3 text-slate-500 font-medium">操作</th>
+            </tr>
+            <tr class="border-b border-slate-50">
+              <th class="py-1 px-3"></th>
+              <th class="py-1 px-3"></th>
+              <th class="text-right py-1 px-3 text-xs text-slate-400">P3</th>
+              <th class="text-right py-1 px-3 text-xs text-slate-400 font-medium text-slate-600">P50</th>
+              <th class="text-right py-1 px-3 text-xs text-slate-400">P97</th>
+              <th class="text-right py-1 px-3 text-xs text-slate-400">P3</th>
+              <th class="text-right py-1 px-3 text-xs text-slate-400 font-medium text-slate-600">P50</th>
+              <th class="text-right py-1 px-3 text-xs text-slate-400">P97</th>
+              <th class="py-1 px-3"></th>
+              <th class="py-1 px-3"></th>
+              <th class="py-1 px-3"></th>
+              <th class="py-1 px-3"></th>
+              <th class="py-1 px-3"></th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="r in enrichedRecords" :key="r.id" class="border-b border-slate-50 hover:bg-slate-50">
+              <td class="py-2 px-3 text-slate-700">{{ r.record_date }}</td>
+              <td class="py-2 px-3 text-slate-700">{{ r.ageLabel }}</td>
+              <td class="py-2 px-3 text-right font-mono text-slate-600" :title="stdTooltip(r.heightStd, 'cm')">{{ r.height_cm ?? '-' }}</td>
+              <td class="py-2 px-3 text-right font-mono text-slate-400">{{ r.heightStd?.p3 ?? '-' }}</td>
+              <td class="py-2 px-3 text-right font-mono font-medium text-slate-700">{{ r.heightStd?.p50 ?? '-' }}</td>
+              <td class="py-2 px-3 text-right font-mono text-slate-400">{{ r.heightStd?.p97 ?? '-' }}</td>
+              <td class="py-2 px-3 text-right font-mono text-slate-600" :title="stdTooltip(r.weightStd, 'kg')">{{ r.weight_kg ?? '-' }}</td>
+              <td class="py-2 px-3 text-right font-mono text-slate-400">{{ r.weightStd?.p3 ?? '-' }}</td>
+              <td class="py-2 px-3 text-right font-mono font-medium text-slate-700">{{ r.weightStd?.p50 ?? '-' }}</td>
+              <td class="py-2 px-3 text-right font-mono text-slate-600">{{ r.bmi ?? '-' }}</td>
+              <td class="py-2 px-3">
+                <span class="text-xs px-2 py-0.5 rounded-full" :class="tagClass(r.heightCategory?.color)">
+                  {{ r.heightCategory?.label }}
+                </span>
+                <span v-if="r.weightCategory" class="text-xs px-2 py-0.5 rounded-full ml-1" :class="tagClass(r.weightCategory?.color)">
+                  {{ r.weightCategory?.label }}
+                </span>
+                <span v-if="r.bmiAssessment" class="text-xs px-2 py-0.5 rounded-full ml-1" :class="tagClass(r.bmiAssessment.color)">
+                  {{ r.bmiAssessment.label }}
+                </span>
+              </td>
+              <td class="py-2 px-3 text-slate-500">{{ r.vision_left ?? '-' }}/{{ r.vision_right ?? '-' }}</td>
+              <td class="py-2 px-3 text-slate-400 max-w-[160px] truncate">{{ r.note || '-' }}</td>
+              <td class="py-2 px-3 text-right whitespace-nowrap">
+                <button class="text-xs text-brand-600 hover:text-brand-700 mr-2" @click="openEdit(r)">编辑</button>
+                <button class="text-xs text-rose-600 hover:text-rose-700" @click="remove(r)">删除</button>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- 曲线图 -->
+    <div v-if="records.length" class="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-5">
+      <div class="card p-4">
+        <div ref="chartRefHeight" style="width:100%;height:320px;"></div>
+      </div>
+      <div class="card p-4">
+        <div ref="chartRefWeight" style="width:100%;height:320px;"></div>
+      </div>
+    </div>
+
+    <!-- 标准查询器 + 整岁对照表 -->
+    <div v-if="yearlyStandards.length" class="card p-4 mb-5">
+      <div class="flex items-center justify-between mb-3 flex-wrap gap-2">
+        <div>
+          <div class="text-sm font-semibold text-slate-800">
+            身高体重标准对照表
+            <span class="text-xs text-slate-400 ml-2">
+              {{ (childStore.current?.gender || 'male') === 'male' ? '男童' : '女童' }} · WS/T 423-2022 + WS/T 611-2018
             </span>
           </div>
-          <div class="text-xs text-slate-500">
-            适用标准：{{ bmiAssessment.source }}
-          </div>
-          <div v-if="bmiAssessment.cutoff" class="text-xs text-slate-400 mt-1">
-            超重 ≥ {{ bmiAssessment.cutoff[0] }}，肥胖 ≥ {{ bmiAssessment.cutoff[1] }}（单位：kg/m²）
-          </div>
+          <div class="text-xs text-slate-500 mt-0.5">点击行查看该年龄的详细标准参考</div>
         </div>
-        <div class="text-xs text-slate-400 max-w-xs">
-          <strong class="text-slate-600">说明：</strong>
-          <span v-if="ageMonths <= 83">0-7 岁采用《7 岁以下儿童生长标准》（WS/T 423-2022）百分位法。P3-P97 为正常范围。</span>
-          <span v-else>6-18 岁采用《学龄儿童青少年超重与肥胖筛查》（WS/T 586-2018）性别年龄别 BMI 切点。</span>
-        </div>
+      </div>
+      <div class="overflow-x-auto">
+        <table class="w-full text-sm">
+          <thead>
+            <tr class="border-b border-slate-100">
+              <th class="text-left py-2 px-3 text-slate-500 font-medium">年龄</th>
+              <th class="text-left py-2 px-3 text-slate-500 font-medium" colspan="3">身高 (cm)</th>
+              <th class="text-left py-2 px-3 text-slate-500 font-medium" colspan="3">体重 (kg)</th>
+            </tr>
+            <tr class="border-b border-slate-100">
+              <th class="py-1 px-3"></th>
+              <th class="text-left py-1 px-3 text-xs text-slate-400">P3</th>
+              <th class="text-left py-1 px-3 text-xs text-slate-400">P50</th>
+              <th class="text-left py-1 px-3 text-xs text-slate-400">P97</th>
+              <th class="text-left py-1 px-3 text-xs text-slate-400">P3</th>
+              <th class="text-left py-1 px-3 text-xs text-slate-400">P50</th>
+              <th class="text-left py-1 px-3 text-xs text-slate-400">P97</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr
+              v-for="(row, i) in yearlyStandards"
+              :key="row.months"
+              class="border-b border-slate-50 cursor-pointer hover:bg-slate-50 transition"
+              :class="currentMonthIndex === i ? 'bg-indigo-50' : ''"
+              @click="onPickAge(row.months)"
+            >
+              <td class="py-2 px-3 font-medium" :class="currentMonthIndex === i ? 'text-indigo-700' : 'text-slate-700'">
+                {{ row.label }}
+                <span v-if="currentMonthIndex === i" class="ml-1 text-xs">📍</span>
+              </td>
+              <td class="py-2 px-3 font-mono text-slate-600">{{ row.height[0] }}</td>
+              <td class="py-2 px-3 font-mono font-medium text-slate-800">
+                {{ row.height[1] ?? row.height[2] }}
+              </td>
+              <td class="py-2 px-3 font-mono text-slate-600">{{ row.height[2] }}</td>
+              <td class="py-2 px-3 font-mono text-slate-600">{{ row.weight[0] }}</td>
+              <td class="py-2 px-3 font-mono font-medium text-slate-800">
+                {{ row.weight[1] ?? row.weight[2] }}
+              </td>
+              <td class="py-2 px-3 font-mono text-slate-600">{{ row.weight[2] }}</td>
+            </tr>
+          </tbody>
+        </table>
       </div>
     </div>
 
@@ -594,111 +721,10 @@ function onPickAge(months) {
       </div>
     </div>
 
-    <!-- 曲线图 -->
-    <div v-if="records.length" class="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-5">
-      <div class="card p-4">
-        <div ref="chartRefHeight" style="width:100%;height:320px;"></div>
-      </div>
-      <div class="card p-4">
-        <div ref="chartRefWeight" style="width:100%;height:320px;"></div>
-      </div>
-    </div>
-
-    <!-- 标准对照表 -->
-    <div v-if="yearlyStandards.length" class="card p-4 mb-5">
-      <div class="flex items-center justify-between mb-3 flex-wrap gap-2">
-        <div>
-          <div class="text-sm font-semibold text-slate-800">
-            身高体重标准对照表
-            <span class="text-xs text-slate-400 ml-2">
-              {{ (childStore.current?.gender || 'male') === 'male' ? '男童' : '女童' }} · WS/T 423-2022 + WS/T 611-2018
-            </span>
-          </div>
-          <div class="text-xs text-slate-500 mt-0.5">点击行查看其他年龄的标准参考</div>
-        </div>
-      </div>
-      <div class="overflow-x-auto">
-        <table class="w-full text-sm">
-          <thead>
-            <tr class="border-b border-slate-100">
-              <th class="text-left py-2 px-3 text-slate-500 font-medium">年龄</th>
-              <th class="text-left py-2 px-3 text-slate-500 font-medium" colspan="3">身高 (cm)</th>
-              <th class="text-left py-2 px-3 text-slate-500 font-medium" colspan="3">体重 (kg)</th>
-            </tr>
-            <tr class="border-b border-slate-100">
-              <th class="py-1 px-3"></th>
-              <th class="text-left py-1 px-3 text-xs text-slate-400">P3</th>
-              <th class="text-left py-1 px-3 text-xs text-slate-400">P50</th>
-              <th class="text-left py-1 px-3 text-xs text-slate-400">P97</th>
-              <th class="text-left py-1 px-3 text-xs text-slate-400">P3</th>
-              <th class="text-left py-1 px-3 text-xs text-slate-400">P50</th>
-              <th class="text-left py-1 px-3 text-xs text-slate-400">P97</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr
-              v-for="(row, i) in yearlyStandards"
-              :key="row.months"
-              class="border-b border-slate-50 cursor-pointer hover:bg-slate-50 transition"
-              :class="currentMonthIndex === i ? 'bg-indigo-50' : ''"
-              @click="onPickAge(row.months)"
-            >
-              <td class="py-2 px-3 font-medium" :class="currentMonthIndex === i ? 'text-indigo-700' : 'text-slate-700'">
-                {{ row.label }}
-                <span v-if="currentMonthIndex === i" class="ml-1 text-xs">📍</span>
-              </td>
-              <td class="py-2 px-3 font-mono text-slate-600">{{ row.height[0] }}</td>
-              <td class="py-2 px-3 font-mono font-medium text-slate-800">
-                {{ row.height[1] ?? row.height[2] }}
-              </td>
-              <td class="py-2 px-3 font-mono text-slate-600">{{ row.height[2] }}</td>
-              <td class="py-2 px-3 font-mono text-slate-600">{{ row.weight[0] }}</td>
-              <td class="py-2 px-3 font-mono font-medium text-slate-800">
-                {{ row.weight[1] ?? row.weight[2] }}
-              </td>
-              <td class="py-2 px-3 font-mono text-slate-600">{{ row.weight[2] }}</td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-    </div>
-
     <div v-if="loading" class="text-center py-10 text-slate-400">加载中…</div>
     <div v-else-if="!records.length" class="card p-10 text-center text-slate-400">
       <div class="text-4xl mb-2">📏</div>
       <div class="text-sm">还没有记录，点击右上角添加</div>
-    </div>
-
-    <div v-else class="card overflow-x-auto">
-      <table class="w-full text-sm">
-        <thead>
-          <tr class="border-b border-slate-100">
-            <th class="text-left py-3 px-4 text-slate-500 font-medium">日期</th>
-            <th class="text-left py-3 px-4 text-slate-500 font-medium">身高 (cm)</th>
-            <th class="text-left py-3 px-4 text-slate-500 font-medium">体重 (kg)</th>
-            <th class="text-left py-3 px-4 text-slate-500 font-medium">BMI</th>
-            <th class="text-left py-3 px-4 text-slate-500 font-medium">左眼视力</th>
-            <th class="text-left py-3 px-4 text-slate-500 font-medium">右眼视力</th>
-            <th class="text-left py-3 px-4 text-slate-500 font-medium">备注</th>
-            <th class="text-right py-3 px-4 text-slate-500 font-medium">操作</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr v-for="r in records" :key="r.id" class="border-b border-slate-50 hover:bg-slate-50">
-            <td class="py-3 px-4">{{ r.record_date }}</td>
-            <td class="py-3 px-4">{{ r.height_cm ?? '-' }}</td>
-            <td class="py-3 px-4">{{ r.weight_kg ?? '-' }}</td>
-            <td class="py-3 px-4">{{ r.bmi ?? '-' }}</td>
-            <td class="py-3 px-4">{{ r.vision_left ?? '-' }}</td>
-            <td class="py-3 px-4">{{ r.vision_right ?? '-' }}</td>
-            <td class="py-3 px-4 text-slate-400 max-w-[200px] truncate">{{ r.note || '-' }}</td>
-            <td class="py-3 px-4 text-right">
-              <button class="text-xs text-brand-600 hover:text-brand-700 mr-2" @click="openEdit(r)">编辑</button>
-              <button class="text-xs text-rose-600 hover:text-rose-700" @click="remove(r)">删除</button>
-            </td>
-          </tr>
-        </tbody>
-      </table>
     </div>
 
     <!-- 新增/编辑弹窗 -->
