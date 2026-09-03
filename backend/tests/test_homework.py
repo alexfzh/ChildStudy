@@ -4,7 +4,13 @@ from datetime import date
 from sqlalchemy import select
 
 from models import Homework, WrongQuestion, WrongQuestionReview
-from routers.homework import delete_homework
+from routers.homework import (
+    create_homework,
+    delete_homework,
+    list_homeworks,
+    update_homework,
+)
+from schemas import HomeworkCreate, HomeworkUpdate
 
 
 class TestDeleteHomeworkCleansWrongQuestions:
@@ -82,3 +88,117 @@ class TestDeleteHomeworkCleansWrongQuestions:
                 WrongQuestionReview.wrong_question_id == wq.id)
         )).scalars().all()
         assert orphan_reviews == [], "错题被清理后不应残留孤儿复习记录"
+
+
+class TestHomeworkCRUD:
+    """作业 CRUD 端到端测试（v1.7.4 补全）"""
+
+    async def _make_child(self, db_session, name="测试娃", grade="四年级"):
+        from models import Family, User
+        fam = Family(name=f"{name}的家")
+        db_session.add(fam)
+        await db_session.flush()
+        user = User(
+            family_id=fam.id, username=f"parent_{name}", password_hash="x",
+            role="parent", display_name="Parent", is_active=True,
+        )
+        db_session.add(user)
+        await db_session.flush()
+        from models import Child
+        child = Child(family_id=fam.id, name=name, grade=grade)
+        db_session.add(child)
+        await db_session.flush()
+        return child
+
+    def _acc(self, child):
+        return {child.id}
+
+    async def test_create_and_list(self, db_session, make_child):
+        child = await make_child("hw_kid_1")
+        hw = await create_homework(
+            HomeworkCreate(
+                child_id=child.id, subject="数学", title="练习一",
+                homework_date=date.today(), duration_minutes=30,
+            ),
+            db=db_session, accessible=self._acc(child),
+        )
+        assert hw.id is not None
+        items = await list_homeworks(
+            child_id=child.id, subject=None, limit=200,
+            db=db_session, accessible=self._acc(child),
+        )
+        assert any(h.id == hw.id for h in items)
+
+    async def test_update_homework(self, db_session, make_child):
+        child = await make_child("hw_kid_2")
+        hw = await create_homework(
+            HomeworkCreate(
+                child_id=child.id, subject="语文", title="古诗背诵",
+                homework_date=date.today(), duration_minutes=20,
+            ),
+            db=db_session, accessible=self._acc(child),
+        )
+        updated = await update_homework(
+            hw.id,
+            HomeworkUpdate(title="古诗背诵-已订正", is_completed=True),
+            db=db_session, accessible=self._acc(child),
+        )
+        assert updated.title == "古诗背诵-已订正"
+        assert updated.completed is True
+
+    async def test_filter_by_subject(self, db_session, make_child):
+        child = await make_child("hw_kid_3")
+        await create_homework(
+            HomeworkCreate(
+                child_id=child.id, subject="数学", title="数学习题",
+                homework_date=date.today(), duration_minutes=15,
+            ),
+            db=db_session, accessible=self._acc(child),
+        )
+        await create_homework(
+            HomeworkCreate(
+                child_id=child.id, subject="语文", title="语文习题",
+                homework_date=date.today(), duration_minutes=15,
+            ),
+            db=db_session, accessible=self._acc(child),
+        )
+        math_items = await list_homeworks(
+            child_id=child.id, subject="数学", limit=200,
+            db=db_session, accessible=self._acc(child),
+        )
+        assert all(h.subject == "数学" for h in math_items)
+        assert len(math_items) == 1
+
+    async def test_delete_homework(self, db_session, make_child):
+        child = await make_child("hw_kid_4")
+        hw = await create_homework(
+            HomeworkCreate(
+                child_id=child.id, subject="英语", title="英语听写",
+                homework_date=date.today(), duration_minutes=10,
+            ),
+            db=db_session, accessible=self._acc(child),
+        )
+        await delete_homework(
+            hw.id, db=db_session, accessible=self._acc(child),
+        )
+        items = await list_homeworks(
+            child_id=child.id, subject=None, limit=200,
+            db=db_session, accessible=self._acc(child),
+        )
+        assert not any(h.id == hw.id for h in items)
+
+    async def test_create_validates_accessible_child(self, db_session, make_child):
+        """家长不能给不在自己家庭的孩子建作业（assert_child_access 守卫）"""
+        child_a = await make_child("hw_a")
+        # 用一个错误的 accessible 集合，期望触发 403
+        import pytest
+        from fastapi import HTTPException
+        with pytest.raises(HTTPException) as ei:
+            await create_homework(
+                HomeworkCreate(
+                    child_id=child_a.id, subject="数学", title="应被拒",
+                    homework_date=date.today(), duration_minutes=10,
+                ),
+                db=db_session, accessible={99999},  # 不包含 child_a.id
+            )
+        assert ei.value.status_code == 403
