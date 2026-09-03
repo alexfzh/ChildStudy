@@ -28,6 +28,7 @@ const blank = () => ({
   school: "",
   avatar_color: "#6366f1",
   birth_date: null,
+  gender: null,
   notes: "",
   subjects: ["语文", "数学", "英语"],
 });
@@ -293,6 +294,16 @@ const historyOf = (childId) => childStore.gradeHistoryMap[childId] || [];
           <SubjectPicker v-model="form.subjects" />
           <div class="text-xs text-slate-400 mt-2">
             💡 点选预设科目，或「+ 自定义」添加（如历史、化学）。录考试时只能从这些科目里选
+          </div>
+        </el-form-item>
+        <el-form-item label="性别">
+          <el-radio-group v-model="form.gender">
+            <el-radio-button :value="null">未填</el-radio-button>
+            <el-radio-button value="male">男</el-radio-button>
+            <el-radio-button value="female">女</el-radio-button>
+          </el-radio-group>
+          <div class="text-xs text-slate-400 mt-1">
+            用于 BMI / 身高生长曲线查表（如未填，BMI 按男孩参考）
           </div>
         </el-form-item>
         <el-form-item label="备注">
