@@ -260,8 +260,8 @@ function buildChartOption(seriesData, bands, title, unit, axisMin, axisMax) {
         return html;
       },
     },
-    legend: { top: 6, icon: "circle", textStyle: { fontSize: 11 } },
-    grid: { top: 50, right: 16, bottom: 30, left: 40 },
+    legend: { show: false },
+    grid: { top: 18, right: 16, bottom: 30, left: 44 },
     xAxis: {
       type: "value",
       name: "月龄",
@@ -396,14 +396,14 @@ function renderCharts() {
   if (chartRefHeight.value) {
     const hChart = echarts.init(chartRefHeight.value);
     hChart.setOption(
-      buildChartOption(hSeries, toBands(heightBands), "身高曲线", "cm", axisMin, axisMax),
+      buildChartOption(hSeries, toBands(heightBands), "", "cm", axisMin, axisMax),
       true
     );
   }
   if (chartRefWeight.value) {
     const wChart = echarts.init(chartRefWeight.value);
     wChart.setOption(
-      buildChartOption(wSeries, toBands(weightBands), "体重曲线", "kg", axisMin, axisMax),
+      buildChartOption(wSeries, toBands(weightBands), "", "kg", axisMin, axisMax),
       true
     );
   }
@@ -458,7 +458,7 @@ function renderCharts() {
   if (chartRefBMI.value && bmiSeries.length) {
     const bmiChart = echarts.init(chartRefBMI.value);
     bmiChart.setOption(
-      buildChartOption(bmiSeries, bmiBandList, "BMI 曲线", "kg/m²", axisMin, axisMax),
+      buildChartOption(bmiSeries, bmiBandList, "", "kg/m²", axisMin, axisMax),
       true
     );
   }
@@ -582,124 +582,167 @@ function tagClass(color) {
 
 <template>
   <div>
-    <div class="flex items-center justify-between mb-4 flex-wrap gap-2">
-      <div>
-        <h2 class="text-lg font-semibold text-slate-800">生长发育</h2>
-        <p class="text-sm text-slate-500 mt-0.5">记录身高、体重、BMI，参照中国儿童生长标准</p>
+    <div class="flex items-center justify-between mb-5 flex-wrap gap-3">
+      <div class="flex items-center gap-3">
+        <span class="inline-flex items-center justify-center w-11 h-11 rounded-2xl bg-gradient-to-br from-brand-500 to-brand-700 text-white text-xl shadow-sm">📈</span>
+        <div>
+          <h2 class="text-lg font-semibold text-slate-800 leading-tight">生长发育</h2>
+          <p class="text-xs text-slate-500 mt-0.5">记录身高、体重、BMI，对照中国儿童生长标准（WS/T 423 · WS/T 611）</p>
+        </div>
       </div>
       <button class="btn-primary" @click="openCreate">+ 添加记录</button>
     </div>
 
     <!-- 最新数据卡片 -->
+    <!-- 最新数据卡片：每张配彩色图标与状态语义色 -->
     <div v-if="records.length" class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-5">
-      <div class="card p-4">
-        <div class="text-xs text-slate-500">最新身高</div>
-        <div class="text-2xl font-semibold text-slate-800 mt-1">{{ latestHeight ? latestHeight + ' cm' : '-' }}</div>
+      <!-- 身高 -->
+      <div class="card p-4 relative overflow-hidden">
+        <div class="absolute left-0 top-0 bottom-0 w-1 bg-gradient-to-b from-brand-400 to-brand-600"></div>
+        <div class="flex items-center gap-2">
+          <span class="inline-flex items-center justify-center w-8 h-8 rounded-xl bg-brand-50 text-brand-600 text-base">📏</span>
+          <span class="text-xs text-slate-500">最新身高</span>
+        </div>
+        <div class="mt-2 flex items-baseline gap-1">
+          <span class="text-2xl font-bold text-slate-800">{{ latestHeight ?? '-' }}</span>
+          <span v-if="latestHeight" class="text-xs text-slate-400 font-medium">cm</span>
+        </div>
         <div v-if="heightStandard && latestHeight" class="mt-2 pt-2 border-t border-slate-100">
-          <div class="text-xs text-slate-400">本年龄标准</div>
-          <div class="text-xs text-slate-600 mt-1">
-            P3 <span class="font-mono">{{ heightStandard.p3 }}</span> · P50 <span class="font-mono">{{ heightStandard.p50 }}</span> · P97 <span class="font-mono">{{ heightStandard.p97 }}</span>
+          <div class="flex items-center justify-between">
+            <div class="text-[11px] text-slate-400">P50 参考 <span class="font-mono text-slate-600">{{ heightStandard.p50 }}</span></div>
+            <div v-if="heightVsStd" class="text-[11px] text-slate-400">P97 <span class="font-mono text-slate-600">{{ heightStandard.p97 }}</span></div>
           </div>
-          <div v-if="heightVsStd" class="mt-1">
-            <span class="text-xs px-2 py-0.5 rounded-full" :class="tagClass(heightVsStd.color)">{{ heightVsStd.label }}</span>
+          <div v-if="heightVsStd" class="mt-1.5">
+            <span class="inline-flex items-center text-[11px] px-2 py-0.5 rounded-full" :class="tagClass(heightVsStd.color)">{{ heightVsStd.label }}</span>
           </div>
         </div>
       </div>
-      <div class="card p-4">
-        <div class="text-xs text-slate-500">最新体重</div>
-        <div class="text-2xl font-semibold text-slate-800 mt-1">{{ latestWeight ? latestWeight + ' kg' : '-' }}</div>
+      <!-- 体重 -->
+      <div class="card p-4 relative overflow-hidden">
+        <div class="absolute left-0 top-0 bottom-0 w-1 bg-gradient-to-b from-emerald-400 to-emerald-600"></div>
+        <div class="flex items-center gap-2">
+          <span class="inline-flex items-center justify-center w-8 h-8 rounded-xl bg-emerald-50 text-emerald-600 text-base">⚖️</span>
+          <span class="text-xs text-slate-500">最新体重</span>
+        </div>
+        <div class="mt-2 flex items-baseline gap-1">
+          <span class="text-2xl font-bold text-slate-800">{{ latestWeight ?? '-' }}</span>
+          <span v-if="latestWeight" class="text-xs text-slate-400 font-medium">kg</span>
+        </div>
         <div v-if="weightStandard && latestWeight" class="mt-2 pt-2 border-t border-slate-100">
-          <div class="text-xs text-slate-400">本年龄标准</div>
-          <div class="text-xs text-slate-600 mt-1">
-            P3 <span class="font-mono">{{ weightStandard.p3 }}</span> · P50 <span class="font-mono">{{ weightStandard.p50 }}</span> · P97 <span class="font-mono">{{ weightStandard.p97 }}</span>
+          <div class="flex items-center justify-between">
+            <div class="text-[11px] text-slate-400">P50 参考 <span class="font-mono text-slate-600">{{ weightStandard.p50 }}</span></div>
+            <div class="text-[11px] text-slate-400">P97 <span class="font-mono text-slate-600">{{ weightStandard.p97 }}</span></div>
           </div>
-          <div v-if="weightVsStd" class="mt-1">
-            <span class="text-xs px-2 py-0.5 rounded-full" :class="tagClass(weightVsStd.color)">{{ weightVsStd.label }}</span>
+          <div v-if="weightVsStd" class="mt-1.5">
+            <span class="inline-flex items-center text-[11px] px-2 py-0.5 rounded-full" :class="tagClass(weightVsStd.color)">{{ weightVsStd.label }}</span>
           </div>
         </div>
       </div>
-      <div class="card p-4">
-        <div class="text-xs text-slate-500">BMI</div>
-        <div class="text-2xl font-semibold text-slate-800 mt-1">{{ latestBMI ?? '-' }}</div>
-        <div v-if="latestBMI" class="mt-2">
-          <span class="text-xs px-2 py-0.5 rounded-full" :class="bmiColorClass.split(' ')[0] + ' ' + bmiColorClass.split(' ')[1]">
+      <!-- BMI -->
+      <div class="card p-4 relative overflow-hidden">
+        <div class="absolute left-0 top-0 bottom-0 w-1" :class="'bg-gradient-to-b from-slate-300 to-slate-500'"></div>
+        <div class="flex items-center gap-2">
+          <span class="inline-flex items-center justify-center w-8 h-8 rounded-xl" :class="bmiColorClass">{{ bmiAssessment.label === '正常' ? '✅' : '🧮' }}</span>
+          <span class="text-xs text-slate-500">BMI</span>
+        </div>
+        <div class="mt-2 flex items-baseline gap-1">
+          <span class="text-2xl font-bold text-slate-800">{{ latestBMI ? latestBMI.toFixed?.(1) ?? latestBMI : '-' }}</span>
+          <span v-if="latestBMI" class="text-[11px] text-slate-400 font-medium">kg/m²</span>
+        </div>
+        <div v-if="latestBMI" class="mt-2 pt-2 border-t border-slate-100">
+          <span v-if="bmiAssessment?.category" class="inline-flex items-center text-[11px] px-2 py-0.5 rounded-full" :class="bmiColorClass">
             {{ bmiAssessment.label }}
           </span>
         </div>
       </div>
-      <div class="card p-4">
-        <div class="text-xs text-slate-500">记录次数</div>
-        <div class="text-2xl font-semibold text-slate-800 mt-1">{{ records.length }} 次</div>
+      <!-- 记录次数 / 最近记录 -->
+      <div class="card p-4 relative overflow-hidden">
+        <div class="absolute left-0 top-0 bottom-0 w-1 bg-gradient-to-b from-amber-400 to-amber-600"></div>
+        <div class="flex items-center gap-2">
+          <span class="inline-flex items-center justify-center w-8 h-8 rounded-xl bg-amber-50 text-amber-600 text-base">🗓️</span>
+          <span class="text-xs text-slate-500">记录次数</span>
+        </div>
+        <div class="mt-2 flex items-baseline gap-1">
+          <span class="text-2xl font-bold text-slate-800">{{ records.length }}</span>
+          <span class="text-xs text-slate-400 font-medium">次</span>
+        </div>
+        <div v-if="latestRecord" class="mt-2 pt-2 border-t border-slate-100">
+          <div class="text-[11px] text-slate-400">最近记录 <span class="text-slate-600 font-medium">{{ latestRecord.record_date }}</span></div>
+          <div v-if="ageMonths != null" class="text-[11px] text-slate-400 mt-0.5">测量时 <span class="text-slate-600 font-medium">{{ ageDisplay(ageMonths) }}</span></div>
+        </div>
       </div>
     </div>
 
     <!-- 核心区域：生长发育详细对比总表 -->
-    <div v-if="enrichedRecords.length" class="card p-4 mb-5">
-      <div class="flex items-center justify-between mb-3 flex-wrap gap-2">
-        <div>
-          <div class="text-sm font-semibold text-slate-800">生长发育详细对比总表</div>
-          <div class="text-xs text-slate-500 mt-0.5">
-            {{ (childStore.current?.gender || 'male') === 'male' ? '男童' : '女童' }} · 每次记录均对照中国儿童生长标准
-          </div>
+    <div v-if="enrichedRecords.length" class="card mb-5 overflow-hidden">
+      <div class="px-4 py-3 border-b border-slate-100 bg-gradient-to-r from-brand-50/70 to-transparent flex items-center justify-between flex-wrap gap-2">
+        <div class="flex items-center gap-2">
+          <span class="text-brand-600">📋</span>
+          <span class="text-sm font-semibold text-slate-800">生长发育详细对比总表</span>
+          <span class="hidden sm:inline text-xs text-slate-400 ml-1">
+            {{ (childStore.current?.gender || 'male') === 'male' ? '男童' : '女童' }} · 对照中国儿童生长标准
+          </span>
         </div>
       </div>
-      <div class="overflow-x-auto">
+      <div class="overflow-x-auto px-2 py-2">
         <table class="w-full text-sm">
           <thead>
-            <tr class="border-b border-slate-100">
-              <th class="text-left py-2 px-3 text-slate-500 font-medium">日期</th>
-              <th class="text-left py-2 px-3 text-slate-500 font-medium">年龄</th>
-              <th class="text-right py-2 px-3 text-slate-500 font-medium" colspan="4">身高 (cm)</th>
-              <th class="text-right py-2 px-3 text-slate-500 font-medium" colspan="4">体重 (kg)</th>
-              <th class="text-right py-2 px-3 text-slate-500 font-medium">BMI</th>
-              <th class="text-left py-2 px-3 text-slate-500 font-medium">等级</th>
-              <th class="text-left py-2 px-3 text-slate-500 font-medium">视力</th>
-              <th class="text-left py-2 px-3 text-slate-500 font-medium">备注</th>
-              <th class="text-right py-2 px-3 text-slate-500 font-medium">操作</th>
+            <tr>
+              <th class="text-left py-2 px-3 text-slate-500 font-medium bg-slate-50/60">日期</th>
+              <th class="text-left py-2 px-3 text-slate-500 font-medium bg-slate-50/60">年龄</th>
+              <th class="text-right py-2 px-3 text-brand-700 font-semibold bg-brand-50/40" colspan="4">📏 身高 (cm)</th>
+              <th class="text-right py-2 px-3 text-emerald-700 font-semibold bg-emerald-50/40" colspan="4">⚖️ 体重 (kg)</th>
+              <th class="text-right py-2 px-3 text-slate-500 font-medium bg-slate-50/60">BMI</th>
+              <th class="text-left py-2 px-3 text-slate-500 font-medium bg-slate-50/60">等级</th>
+              <th class="text-left py-2 px-3 text-slate-500 font-medium bg-slate-50/60">视力</th>
+              <th class="text-left py-2 px-3 text-slate-500 font-medium bg-slate-50/60">备注</th>
+              <th class="text-right py-2 px-3 text-slate-500 font-medium bg-slate-50/60">操作</th>
             </tr>
-            <tr class="border-b border-slate-50">
-              <th class="py-1 px-3"></th>
-              <th class="py-1 px-3"></th>
-              <th class="text-right py-1 px-3 text-xs text-slate-600 font-medium">孩子</th>
-              <th class="text-right py-1 px-3 text-xs text-slate-400">P3</th>
-              <th class="text-right py-1 px-3 text-xs text-slate-400 font-medium text-slate-600">P50</th>
-              <th class="text-right py-1 px-3 text-xs text-slate-400">P97</th>
-              <th class="text-right py-1 px-3 text-xs text-slate-600 font-medium">孩子</th>
-              <th class="text-right py-1 px-3 text-xs text-slate-400">P3</th>
-              <th class="text-right py-1 px-3 text-xs text-slate-400 font-medium text-slate-600">P50</th>
-              <th class="text-right py-1 px-3 text-xs text-slate-400">P97</th>
-              <th class="py-1 px-3"></th>
-              <th class="py-1 px-3"></th>
-              <th class="py-1 px-3"></th>
-              <th class="py-1 px-3"></th>
-              <th class="py-1 px-3"></th>
+            <tr class="border-b border-slate-100">
+              <th class="py-1 px-3 bg-slate-50/60"></th>
+              <th class="py-1 px-3 bg-slate-50/60"></th>
+              <th class="text-right py-1 px-3 text-[11px] text-brand-700 font-bold bg-brand-50/40">孩子</th>
+              <th class="text-right py-1 px-3 text-[11px] text-slate-400 bg-brand-50/40">P3</th>
+              <th class="text-right py-1 px-3 text-[11px] text-slate-500 font-semibold bg-brand-50/40">P50</th>
+              <th class="text-right py-1 px-3 text-[11px] text-slate-400 bg-brand-50/40">P97</th>
+              <th class="text-right py-1 px-3 text-[11px] text-emerald-700 font-bold bg-emerald-50/40">孩子</th>
+              <th class="text-right py-1 px-3 text-[11px] text-slate-400 bg-emerald-50/40">P3</th>
+              <th class="text-right py-1 px-3 text-[11px] text-slate-500 font-semibold bg-emerald-50/40">P50</th>
+              <th class="text-right py-1 px-3 text-[11px] text-slate-400 bg-emerald-50/40">P97</th>
+              <th class="py-1 px-3 bg-slate-50/60"></th>
+              <th class="py-1 px-3 bg-slate-50/60"></th>
+              <th class="py-1 px-3 bg-slate-50/60"></th>
+              <th class="py-1 px-3 bg-slate-50/60"></th>
+              <th class="py-1 px-3 bg-slate-50/60"></th>
             </tr>
           </thead>
           <tbody>
-            <tr v-for="r in enrichedRecords" :key="r.id" class="border-b border-slate-50 hover:bg-slate-50">
+            <tr v-for="r in enrichedRecords" :key="r.id" class="border-b border-slate-50 hover:bg-brand-50/30">
               <td class="py-2 px-3 text-slate-700">{{ r.record_date }}</td>
-              <td class="py-2 px-3 text-slate-700">{{ r.ageLabel }}</td>
-              <td class="py-2 px-3 text-right font-mono font-semibold text-slate-800" :title="stdTooltip(r.heightStd, 'cm')">{{ r.height_cm ?? '-' }}</td>
+              <td class="py-2 px-3 text-slate-500 whitespace-nowrap">{{ r.ageLabel }}</td>
+              <td class="py-2 px-3 text-right font-mono font-bold text-brand-700" :title="stdTooltip(r.heightStd, 'cm')">{{ r.height_cm ?? '-' }}</td>
               <td class="py-2 px-3 text-right font-mono text-slate-400">{{ r.heightStd?.p3 ?? '-' }}</td>
-              <td class="py-2 px-3 text-right font-mono font-medium text-slate-700">{{ r.heightStd?.p50 ?? '-' }}</td>
+              <td class="py-2 px-3 text-right font-mono font-medium text-slate-600">{{ r.heightStd?.p50 ?? '-' }}</td>
               <td class="py-2 px-3 text-right font-mono text-slate-400">{{ r.heightStd?.p97 ?? '-' }}</td>
-              <td class="py-2 px-3 text-right font-mono font-semibold text-slate-800" :title="stdTooltip(r.weightStd, 'kg')">{{ r.weight_kg ?? '-' }}</td>
+              <td class="py-2 px-3 text-right font-mono font-bold text-emerald-700" :title="stdTooltip(r.weightStd, 'kg')">{{ r.weight_kg ?? '-' }}</td>
               <td class="py-2 px-3 text-right font-mono text-slate-400">{{ r.weightStd?.p3 ?? '-' }}</td>
-              <td class="py-2 px-3 text-right font-mono font-medium text-slate-700">{{ r.weightStd?.p50 ?? '-' }}</td>
+              <td class="py-2 px-3 text-right font-mono font-medium text-slate-600">{{ r.weightStd?.p50 ?? '-' }}</td>
               <td class="py-2 px-3 text-right font-mono text-slate-400">{{ r.weightStd?.p97 ?? '-' }}</td>
               <td class="py-2 px-3 text-right font-mono text-slate-600">{{ r.bmi ?? '-' }}</td>
               <td class="py-2 px-3">
-                <span class="text-xs px-2 py-0.5 rounded-full" :class="tagClass(r.heightCategory?.color)">
-                  {{ r.heightCategory?.label }}
-                </span>
-                <span v-if="r.weightCategory" class="text-xs px-2 py-0.5 rounded-full ml-1" :class="tagClass(r.weightCategory?.color)">
-                  {{ r.weightCategory?.label }}
-                </span>
-                <span v-if="r.bmiAssessment" class="text-xs px-2 py-0.5 rounded-full ml-1" :class="tagClass(r.bmiAssessment.color)">
-                  {{ r.bmiAssessment.label }}
-                </span>
+                <div class="flex flex-wrap gap-1">
+                  <span class="text-[11px] px-2 py-0.5 rounded-full inline-flex items-center" :class="tagClass(r.heightCategory?.color)">
+                    H {{ r.heightCategory?.label }}
+                  </span>
+                  <span v-if="r.weightCategory" class="text-[11px] px-2 py-0.5 rounded-full inline-flex items-center" :class="tagClass(r.weightCategory?.color)">
+                    W {{ r.weightCategory?.label }}
+                  </span>
+                  <span v-if="r.bmiAssessment" class="text-[11px] px-2 py-0.5 rounded-full inline-flex items-center" :class="tagClass(r.bmiAssessment.color)">
+                    BMI {{ r.bmiAssessment.label }}
+                  </span>
+                </div>
               </td>
-              <td class="py-2 px-3 text-slate-500">{{ r.vision_left ?? '-' }}/{{ r.vision_right ?? '-' }}</td>
+              <td class="py-2 px-3 text-slate-500 whitespace-nowrap font-mono">{{ r.vision_left ?? '-' }}<span class="text-slate-300">/</span>{{ r.vision_right ?? '-' }}</td>
               <td class="py-2 px-3 text-slate-400 max-w-[160px] truncate">{{ r.note || '-' }}</td>
               <td class="py-2 px-3 text-right whitespace-nowrap">
                 <button class="text-xs text-brand-600 hover:text-brand-700 mr-2" @click="openEdit(r)">编辑</button>
@@ -713,63 +756,104 @@ function tagClass(color) {
 
     <!-- 曲线图 -->
     <div v-if="records.length" class="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-5">
-      <div class="card p-4">
-        <div ref="chartRefHeight" style="width:100%;height:320px;"></div>
+      <div class="card overflow-hidden">
+        <div class="px-4 py-2 border-b border-slate-100 bg-slate-50/50 flex items-center justify-between flex-wrap gap-2">
+          <span class="text-xs font-semibold text-slate-600">📏 身高曲线</span>
+          <span class="flex items-center gap-2 text-[11px] text-slate-400">
+            <span class="inline-flex items-center gap-1"><i class="w-3 h-0.5 inline-block bg-red-400"></i>P3</span>
+            <span class="inline-flex items-center gap-1"><i class="w-3 h-0.5 inline-block bg-yellow-400"></i>P50</span>
+            <span class="inline-flex items-center gap-1"><i class="w-3 h-0.5 inline-block bg-green-400"></i>P97</span>
+            <span class="inline-flex items-center gap-1"><i class="w-2 h-2 inline-block rounded-full bg-indigo-500"></i>孩子</span>
+          </span>
+        </div>
+        <div ref="chartRefHeight" class="p-2" style="width:100%;height:300px;"></div>
       </div>
-      <div class="card p-4">
-        <div ref="chartRefWeight" style="width:100%;height:320px;"></div>
+      <div class="card overflow-hidden">
+        <div class="px-4 py-2 border-b border-slate-100 bg-slate-50/50 flex items-center justify-between flex-wrap gap-2">
+          <span class="text-xs font-semibold text-slate-600">⚖️ 体重曲线</span>
+          <span class="flex items-center gap-2 text-[11px] text-slate-400">
+            <span class="inline-flex items-center gap-1"><i class="w-3 h-0.5 inline-block bg-red-400"></i>P3</span>
+            <span class="inline-flex items-center gap-1"><i class="w-3 h-0.5 inline-block bg-yellow-400"></i>P50</span>
+            <span class="inline-flex items-center gap-1"><i class="w-3 h-0.5 inline-block bg-green-400"></i>P97</span>
+            <span class="inline-flex items-center gap-1"><i class="w-2 h-2 inline-block rounded-full bg-indigo-500"></i>孩子</span>
+          </span>
+        </div>
+        <div ref="chartRefWeight" class="p-2" style="width:100%;height:300px;"></div>
       </div>
     </div>
 
     <!-- BMI 曲线 + 身体状态说明 -->
     <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-5">
-      <div v-if="records.length" class="card p-4">
-        <div ref="chartRefBMI" style="width:100%;height:300px;"></div>
+      <div v-if="records.length" class="card overflow-hidden">
+        <div class="px-4 py-2 border-b border-slate-100 bg-slate-50/50 flex items-center justify-between flex-wrap gap-2">
+          <span class="text-xs font-semibold text-slate-600">🧮 BMI 曲线</span>
+          <span v-if="ageMonths != null && ageMonths >= 84" class="flex items-center gap-2 text-[11px] text-slate-400">
+            <span class="inline-flex items-center gap-1"><i class="w-3 h-0.5 inline-block bg-amber-500"></i>超重界</span>
+            <span class="inline-flex items-center gap-1"><i class="w-3 h-0.5 inline-block bg-red-500"></i>肥胖界</span>
+            <span class="inline-flex items-center gap-1"><i class="w-2 h-2 inline-block rounded-full bg-indigo-500"></i>孩子</span>
+          </span>
+          <span v-else class="flex items-center gap-2 text-[11px] text-slate-400">
+            <span class="inline-flex items-center gap-1"><i class="w-3 h-0.5 inline-block bg-red-400"></i>P3</span>
+            <span class="inline-flex items-center gap-1"><i class="w-3 h-0.5 inline-block bg-yellow-400"></i>P50</span>
+            <span class="inline-flex items-center gap-1"><i class="w-3 h-0.5 inline-block bg-green-400"></i>P97</span>
+            <span class="inline-flex items-center gap-1"><i class="w-2 h-2 inline-block rounded-full bg-indigo-500"></i>孩子</span>
+          </span>
+        </div>
+        <div ref="chartRefBMI" class="p-2" style="width:100%;height:300px;"></div>
       </div>
-      <div v-if="currentBmiInfo" class="card p-4 border" :class="currentBmiInfo.advice.bg">
-        <div class="flex items-center justify-between mb-2 flex-wrap gap-2">
-          <div class="text-sm font-semibold text-slate-800">身体状态说明</div>
-          <span v-if="latestRecord" class="text-xs text-slate-400">{{ latestRecord.record_date }}</span>
+      <div v-if="currentBmiInfo" class="card overflow-hidden border" :class="currentBmiInfo.advice.bg">
+        <div class="px-4 py-3 flex items-center justify-between flex-wrap gap-2" :class="'bg-white/40'">
+          <div class="flex items-center gap-2">
+            <span class="text-base">💡</span>
+            <span class="text-sm font-semibold text-slate-800">身体状态说明</span>
+          </div>
+          <span v-if="latestRecord" class="text-xs text-slate-500">{{ latestRecord.record_date }}</span>
         </div>
-        <div class="flex items-center gap-3 mb-3 flex-wrap">
-          <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-semibold" :class="bmiColorClass">
-            {{ currentBmiInfo.assessment.label }}
-          </span>
-          <span class="text-xs text-slate-500">
-            BMI <strong class="font-mono text-slate-700">{{ latestBMI?.toFixed?.(1) ?? latestBMI }}</strong>
-            <span v-if="ageMonths != null" class="ml-1">· {{ ageDisplay(ageMonths) }}</span>
-          </span>
+        <div class="p-4">
+          <div class="flex items-center gap-3 mb-3 flex-wrap">
+            <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-semibold shadow-sm" :class="bmiColorClass">
+              {{ currentBmiInfo.assessment.label }}
+            </span>
+            <span class="text-xs text-slate-500">
+              BMI <strong class="font-mono text-slate-700">{{ latestBMI?.toFixed?.(1) ?? latestBMI }}</strong>
+              <span v-if="ageMonths != null" class="ml-1">· {{ ageDisplay(ageMonths) }}</span>
+            </span>
+          </div>
+          <p class="text-sm mb-3 leading-relaxed font-medium" :class="currentBmiInfo.advice.tone">
+            {{ currentBmiInfo.advice.desc }}
+          </p>
+          <div class="rounded-xl bg-white/70 border border-slate-200/70 p-3 mb-3">
+            <p class="text-xs text-slate-600 leading-relaxed">
+              <span class="font-semibold text-slate-700">✨ 给孩子的建议：</span>{{ currentBmiInfo.advice.advice }}
+            </p>
+          </div>
+          <p class="text-[11px] text-slate-400 leading-relaxed">
+            📖 依据：{{ currentBmiInfo.assessment.source }}
+            <template v-if="currentBmiInfo.assessment.cutoff">
+              · 本年龄超重界 <span class="font-mono font-medium">{{ currentBmiInfo.assessment.cutoff[0] }}</span> / 肥胖界
+              <span class="font-mono font-medium">{{ currentBmiInfo.assessment.cutoff[1] }}</span>
+            </template>
+            <span v-else>（百分位法，阈值随年龄/性别自动判定）</span>
+          </p>
         </div>
-        <p class="text-sm mb-1.5 leading-relaxed" :class="currentBmiInfo.advice.tone">
-          {{ currentBmiInfo.advice.desc }}
-        </p>
-        <p class="text-xs text-slate-600 leading-relaxed mb-2">
-          <span class="font-medium text-slate-700">建议：</span>{{ currentBmiInfo.advice.advice }}
-        </p>
-        <p class="text-[11px] text-slate-400">
-          依据：{{ currentBmiInfo.assessment.source }}
-          <template v-if="currentBmiInfo.assessment.cutoff">
-            ，本年龄超重界 <span class="font-mono">{{ currentBmiInfo.assessment.cutoff[0] }}</span> / 肥胖界
-            <span class="font-mono">{{ currentBmiInfo.assessment.cutoff[1] }}</span>
-          </template>
-          <span v-else>（百分位法，阈值随年龄/性别自动判定）</span>
-        </p>
       </div>
     </div>
 
-    <!-- 标准查询器 + 整岁对照表 -->
-    <div v-if="yearlyStandards.length" class="card p-4 mb-5">
-      <div class="flex items-center justify-between mb-3 flex-wrap gap-2">
-        <div>
-          <div class="text-sm font-semibold text-slate-800">
-            身高体重标准对照表
-            <span class="text-xs text-slate-400 ml-2">
-              {{ (childStore.current?.gender || 'male') === 'male' ? '男童' : '女童' }} · WS/T 423-2022 + WS/T 611-2018
-            </span>
-          </div>
+    <!-- 标准对照表 -->
+    <div v-if="yearlyStandards.length" class="card mb-5 overflow-hidden">
+      <div class="px-4 py-3 border-b border-slate-100 bg-gradient-to-r from-brand-50/70 to-transparent flex items-center justify-between flex-wrap gap-2">
+        <div class="flex items-center gap-2 flex-wrap">
+          <span class="text-brand-600">📐</span>
+          <span class="text-sm font-semibold text-slate-800">身高体重标准对照表</span>
+          <span class="text-xs text-slate-400 ml-1">
+            {{ (childStore.current?.gender || 'male') === 'male' ? '男童' : '女童' }} · WS/T 423-2022 + WS/T 611-2018
+          </span>
         </div>
+        <span v-if="currentMonthIndex >= 0" class="text-[11px] text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-full">
+          📍 当前年龄（高亮行）
+        </span>
       </div>
-      <div class="overflow-x-auto">
+      <div class="overflow-x-auto px-2 py-2">
         <table class="w-full text-sm">
           <thead>
             <tr class="border-b border-slate-100">
@@ -814,10 +898,15 @@ function tagClass(color) {
       </div>
     </div>
 
-    <div v-if="loading" class="text-center py-10 text-slate-400">加载中…</div>
-    <div v-else-if="!records.length" class="card p-10 text-center text-slate-400">
-      <div class="text-4xl mb-2">📏</div>
-      <div class="text-sm">还没有记录，点击右上角添加</div>
+    <div v-if="loading" class="flex items-center justify-center py-14 text-slate-400 gap-2">
+      <span class="inline-block w-4 h-4 border-2 border-slate-300 border-t-brand-600 rounded-full animate-spin"></span>
+      <span class="text-sm">加载中…</span>
+    </div>
+    <div v-else-if="!records.length" class="card p-12 text-center">
+      <div class="text-5xl mb-3">📏</div>
+      <div class="text-base font-medium text-slate-600 mb-1">还没有生长发育记录</div>
+      <div class="text-sm text-slate-400 mb-5">记录身高、体重、BMI，系统将自动对照儿童生长标准生成曲线与评估</div>
+      <button class="btn-primary" @click="openCreate">+ 添加第一条记录</button>
     </div>
 
     <!-- 新增/编辑弹窗 -->
