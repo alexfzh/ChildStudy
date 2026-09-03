@@ -1,0 +1,92 @@
+/**
+ * Growth page utilities.
+ *
+ * - fetchStandards(): GET /api/growth/standards
+ * - computeBMI(height_cm, weight_kg)
+ * - assessBMI(bmi, gender, age_months) -> { category, label, color }
+ * - getPercentileLabel(category) -> string
+ */
+
+const API_BASE = import.meta.env.VITE_API_BASE || "";
+
+// Cache standards in memory (they don't change during session)
+let _standardsCache = null;
+
+export async function fetchStandards() {
+  if (_standardsCache) return _standardsCache;
+  const res = await fetch(`${API_BASE}/api/growth/standards`);
+  if (!res.ok) throw new Error(`Failed to fetch standards: ${res.status}`);
+  _standardsCache = await res.json();
+  return _standardsCache;
+}
+
+export function computeBMI(heightCm, weightKg) {
+  if (!heightCm || !weightKg || heightCm <= 0 || weightKg <= 0) return null;
+  const h = heightCm / 100;
+  return Math.round((weightKg / (h * h)) * 100) / 100;
+}
+
+/**
+ * BMI category based on WS/T 586-2018 (6-18岁) or approximate (<6岁).
+ * Returns { category, label, color, source }
+ */
+export function assessBMI(bmi, gender, ageMonths) {
+  if (bmi == null || ageMonths == null) {
+    return { category: "unknown", label: "-", color: "default", source: "-" };
+  }
+  const g = (gender || "male").toLowerCase();
+  if (ageMonths <= 83) {
+    return {
+      category: "approximate",
+      label: "需医生评估",
+      color: "info",
+      source: "WS/T 423-2022（0-7 岁建议用 BMI 百分位表）",
+    };
+  }
+  if (ageMonths > 216) {
+    return { category: "unknown", label: "-", color: "default", source: "-" };
+  }
+  // 6-18 岁: WS/T 586-2018
+  const ageStr = String(Math.round((ageMonths / 12) * 2) / 2);
+  const cutoffs = _STANDARDS?.bmi_cutoffs_6_18?.[g]?.[ageStr];
+  if (!cutoffs) {
+    return { category: "unknown", label: "-", color: "default", source: "-" };
+  }
+  const [ow, ob] = cutoffs;
+  if (bmi >= ob) return { category: "obese", label: "肥胖", color: "danger", source: "WS/T 586-2018", cutoff: cutoffs };
+  if (bmi >= ow) return { category: "overweight", label: "超重", color: "warning", source: "WS/T 586-2018", cutoff: cutoffs };
+  return { category: "normal", label: "正常", color: "success", source: "WS/T 586-2018", cutoff: cutoffs };
+}
+
+/**
+ * Height/weight percentile label from category.
+ */
+export function getPercentileLabel(category) {
+  const map = {
+    down: "下（<P3）",
+    mid_down: "中下",
+    mid: "中",
+    mid_up: "中上",
+    up: "上（≥P97）",
+    unknown: "-",
+    approximate: "需医生评估",
+  };
+  return map[category] || "-";
+}
+
+export const BMI_COLORS = {
+  normal: "#10b981",
+  overweight: "#f59e0b",
+  obese: "#ef4444",
+  unknown: "#94a3b8",
+  approximate: "#6366f1",
+};
+
+// In-memory standards reference (set after fetchStandards)
+export function setStandards(data) {
+  _standardsCache = data;
+}
+
+export function getStandards() {
+  return _standardsCache;
+}
