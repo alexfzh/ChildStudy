@@ -1,9 +1,17 @@
 import { defineConfig } from "vite";
 import vue from "@vitejs/plugin-vue";
 import path from "path";
+import AutoImport from "unplugin-auto-import/vite";
+import Components from "unplugin-vue-components/vite";
+import { ElementPlusResolver } from "unplugin-vue-components/resolvers";
 
 export default defineConfig({
-  plugins: [vue()],
+  plugins: [
+    vue(),
+    // element-plus 按需引入：模板组件 + API 自动按需导入（含样式）
+    AutoImport({ resolvers: [ElementPlusResolver()] }),
+    Components({ resolvers: [ElementPlusResolver()] }),
+  ],
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),
@@ -29,7 +37,8 @@ export default defineConfig({
       output: {
         manualChunks: {
           vue: ["vue", "vue-router", "pinia"],
-          element: ["element-plus"],
+          // element-plus 已改为按需引入（unplugin），不可再列 "element-plus"
+          // 否则全量包会被 manualChunks 原样打回（938KB）
           charts: ["echarts", "vue-echarts"],
         },
       },

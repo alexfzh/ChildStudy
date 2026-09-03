@@ -99,13 +99,15 @@
 ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
 ::-webkit-scrollbar-thumb:hover { background: #94a6b8; }
 
-/* Element Plus 移动端覆盖 */
+/* Element Plus 移动端覆盖
+   注意:element-plus 按需引入后组件样式为 lazy 加载(晚于本文件),
+   同特异性规则会被组件样式反压,故此处覆盖必须带 !important */
 @media (max-width: 768px) {
   .el-table {
-    font-size: 13px;
+    font-size: 13px !important;
   }
   .el-table .cell {
-    padding: 8px 10px;
+    padding: 8px 10px !important;
   }
   .el-dialog {
     width: 92% !important;
@@ -115,7 +117,7 @@
     width: 92% !important;
   }
   .el-select-dropdown {
-    max-height: 50vh;
+    max-height: 50vh !important;
   }
   .el-picker-panel {
     width: 100% !important;

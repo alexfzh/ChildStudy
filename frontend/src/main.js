@@ -1,11 +1,16 @@
 import { createApp } from "vue";
 import { createPinia } from "pinia";
-import ElementPlus from "element-plus";
-import zhCn from "element-plus/dist/locale/zh-cn.mjs";
+// element-plus 改为按需引入（vite.config.js 的 unplugin 两个插件负责模板组件与 API）。
+// 函数式组件（ElMessage/ElMessageBox）与指令（v-loading）不走模板编译，
+// resolver 捕获不到，样式需在此手动引入；ElLoading 插件负责注册 v-loading 指令。
+import { ElLoading } from "element-plus";
+import "element-plus/es/components/message/style/css";
+import "element-plus/es/components/message-box/style/css";
+import "element-plus/es/components/notification/style/css";
+import "element-plus/es/components/loading/style/css";
 import dayjs from "dayjs";
 import utc from "dayjs/plugin/utc";
 import timezone from "dayjs/plugin/timezone";
-import "element-plus/dist/index.css";
 import App from "./App.vue";
 import router from "./router";
 import "./style.css";
@@ -28,7 +33,8 @@ app.config.errorHandler = (err, instance, info) => {
 
 app.use(createPinia());
 app.use(router);
-app.use(ElementPlus, { locale: zhCn });
+// v-loading 指令（按需注册；组件本身由 unplugin 按需解析）
+app.use(ElLoading);
 app.mount("#app");
 
 // window 级兜底：统一以 warn 形式记录「未捕获错误 / 未处理的 Promise 拒绝」，

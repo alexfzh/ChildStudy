@@ -3,6 +3,10 @@ import { computed, onMounted } from "vue";
 import { useRoute } from "vue-router";
 import { useChildStore } from "@/stores/child";
 import { useAuthStore } from "@/stores/auth";
+import { ElConfigProvider } from "element-plus";
+// element-plus 按需引入后,locale 由 el-config-provider 传递
+// (原先靠 app.use(ElementPlus, { locale }) 全量注册时传入)
+import zhCn from "element-plus/dist/locale/zh-cn.mjs";
 import Layout from "@/components/Layout.vue";
 
 const route = useRoute();
@@ -34,20 +38,22 @@ onMounted(async () => {
 </script>
 
 <template>
-  <Layout v-if="useLayout">
-    <router-view v-slot="{ Component }">
+  <el-config-provider :locale="zhCn">
+    <Layout v-if="useLayout">
+      <router-view v-slot="{ Component }">
+        <transition name="fade" mode="out-in">
+          <div class="route-wrapper">
+            <component :is="Component" />
+          </div>
+        </transition>
+      </router-view>
+    </Layout>
+    <router-view v-else v-slot="{ Component }">
       <transition name="fade" mode="out-in">
-        <div class="route-wrapper">
-          <component :is="Component" />
-        </div>
+        <component :is="Component" />
       </transition>
     </router-view>
-  </Layout>
-  <router-view v-else v-slot="{ Component }">
-    <transition name="fade" mode="out-in">
-      <component :is="Component" />
-    </transition>
-  </router-view>
+  </el-config-provider>
 </template>
 
 <style>

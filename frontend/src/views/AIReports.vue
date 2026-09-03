@@ -203,13 +203,20 @@ const renderMarkdown = (md) => {
   html = html.replace(/`([^`]+)`/g, "<code>$1</code>");
   // 链接（带协议白名单，防 javascript:/data:/vbscript: XSS）
   // 仅允许 http(s) 与相对路径，命中其他协议则剥离链接但保留文本
+  // 安全：url 插入 href 前必须转义引号/尖括号，否则 `http://a.com" onmouseover="..."`
+  //       这类“安全协议”+空格+引号的 URL 可注入 HTML 属性（属性逃逸 XSS）。
   const SAFE_URL_RE = /^(https?:\/\/|\/|#)/i;
+  const escapeAttr = (s) => s
+    .replace(/&/g, "&amp;")
+    .replace(/"/g, "&quot;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;");
   html = html.replace(
     /\[([^\]]+)\]\(([^)]+)\)/g,
     (m, text, url) => {
       const safe = SAFE_URL_RE.test(url.trim());
       return safe
-        ? `<a href="${url}" target="_blank" rel="noopener noreferrer">${text}</a>`
+        ? `<a href="${escapeAttr(url)}" target="_blank" rel="noopener noreferrer">${text}</a>`
         : `<span class="text-red-500" title="不安全的链接已被移除">${text}</span>`;
     }
   );
