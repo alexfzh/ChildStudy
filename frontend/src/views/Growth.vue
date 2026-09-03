@@ -50,6 +50,49 @@ const bmiColorClass = computed(() => {
   return map[bmiAssessment.value.category] || "text-slate-400 bg-slate-50";
 });
 
+// BMI 身体状态说明（儿童口径：阈值随年龄/性别由标准表自动判定，非成人固定数值）
+const bmiAdvice = {
+  thin: {
+    title: "偏瘦",
+    tone: "text-sky-700",
+    bg: "bg-sky-50 border-sky-200",
+    desc: "BMI 低于同龄同性别参考下限，可能存在营养摄入不足或消耗偏大。",
+    advice: "建议保证均衡饮食与足量优质蛋白、能量摄入，规律进餐；如持续偏低，可咨询儿科或营养科评估。",
+  },
+  normal: {
+    title: "正常",
+    tone: "text-emerald-700",
+    bg: "bg-emerald-50 border-emerald-200",
+    desc: "体型处于同龄同性别正常范围，健康风险较低。",
+    advice: "保持均衡饮食、规律作息与适量户外运动即可。",
+  },
+  overweight: {
+    title: "超重",
+    tone: "text-amber-700",
+    bg: "bg-amber-50 border-amber-200",
+    desc: "BMI 已达超重界，需关注代谢异常等健康风险。",
+    advice: "控制高热量零食与含糖饮料，增加运动、减少久坐，保持规律作息，动态监测变化。",
+  },
+  obese: {
+    title: "肥胖",
+    tone: "text-red-700",
+    bg: "bg-red-50 border-red-200",
+    desc: "BMI 已达肥胖界，与心血管、代谢性疾病风险密切相关。",
+    advice: "建议尽早到儿科 / 内分泌科 / 营养门诊评估，在医生指导下调整饮食结构与增加运动。",
+  },
+};
+
+// 当前最新记录对应的 BMI 身体状态说明（若无明确评估则不显示卡）
+const currentBmiInfo = computed(() => {
+  const cat = bmiAssessment.value?.category;
+  if (!cat || !bmiAdvice[cat]) return null;
+  return {
+    category: cat,
+    advice: bmiAdvice[cat],
+    assessment: bmiAssessment.value,
+  };
+});
+
 // ---------- 标准 lookup ----------
 function lookupStdRow(metric, months) {
   if (!standards.value || months == null) return null;
@@ -217,6 +260,7 @@ function onPickAge(months) {
 // ---------- Charts ----------
 const chartRefHeight = ref(null);
 const chartRefWeight = ref(null);
+const chartRefBMI = ref(null);
 
 function buildChartOption(seriesData, bands, title, unit, axisMin, axisMax) {
   return {
@@ -292,7 +336,13 @@ function renderCharts() {
       if (!bd || !r.record_date) return null;
       const rd = new Date(r.record_date);
       const months = (rd.getFullYear() - bd.getFullYear()) * 12 + (rd.getMonth() - bd.getMonth());
-      return { months, height: r.height_cm, weight: r.weight_kg, record: r };
+      return {
+        months,
+        height: r.height_cm,
+        weight: r.weight_kg,
+        bmi: r.bmi ?? (r.height_cm && r.weight_kg ? growthUtil.computeBMI(r.height_cm, r.weight_kg) : null),
+        record: r,
+      };
     })
     .filter(Boolean)
     .sort((a, b) => a.months - b.months);
@@ -377,6 +427,61 @@ function renderCharts() {
     const wChart = echarts.init(chartRefWeight.value);
     wChart.setOption(
       buildChartOption(wSeries, toBands(weightBands), "体重曲线", "kg", axisMin, axisMax),
+      true
+    );
+  }
+
+  // ---- BMI 曲线 ----
+  // 参考线分两套：<7岁用 BMI_0_83 的 P3/P50/P97（WS/T 423）；≥7岁用 BMI_CUTOFFS_6_18 的
+  // 超重/肥胖界值（WS/T 586，无 BMI 百分位常模，仅给警示界）。窗口内逐月取对应参考。
+  const bmiRefAt = (month) => {
+    if (month <= 83) {
+      const row = standards.value.bmi_0_83_months?.[g]?.[String(month)];
+      if (!row) return null;
+      // 0-83 月 BMI 行 5 档 [P3,P15,P50,P85,P97]
+      return row.length >= 5 ? { kind: "pct", p3: row[0], p50: row[2], p97: row[4] } : null;
+    }
+    const table = standards.value.bmi_cutoffs_6_18?.[g];
+    if (!table) return null;
+    const keys = Object.keys(table).map(Number).sort((a, b) => a - b);
+    if (!keys.length) return null;
+    const yr = month / 12;
+    const nearest = keys.reduce((p, c) => (Math.abs(c - yr) < Math.abs(p - yr) ? c : p));
+    const row = table[String(nearest)];
+    return row ? { kind: "cut", ow: row[0], ob: row[1] } : null;
+  };
+  const bmiBands = { P3: [], P50: [], P97: [], 超重: [], 肥胖: [] };
+  for (let m = axisMin; m <= axisMax; m++) {
+    const r = bmiRefAt(m);
+    if (!r) continue;
+    if (r.kind === "pct") {
+      bmiBands.P3.push([m, r.p3]);
+      bmiBands.P50.push([m, r.p50]);
+      bmiBands.P97.push([m, r.p97]);
+    } else {
+      bmiBands.超重.push([m, r.ow]);
+      bmiBands.肥胖.push([m, r.ob]);
+    }
+  }
+  const bmiStyle = {
+    P3: { color: "#ef4444", ls: "dashed" },
+    P50: { color: "#eab308", ls: "dashed" },
+    P97: { color: "#22c55e", ls: "dashed" },
+    超重: { color: "#f59e0b", ls: "dashed" },
+    肥胖: { color: "#dc2626", ls: "dashed" },
+  };
+  const bmiBandList = ["P3", "P50", "P97", "超重", "肥胖"]
+    .map((name) =>
+      bmiBands[name].length
+        ? { name, data: bmiBands[name], color: bmiStyle[name].color, lineStyle: bmiStyle[name].ls }
+        : null
+    )
+    .filter(Boolean);
+  const bmiSeries = points.filter((p) => p.bmi != null).map((p) => [p.months, p.bmi]);
+  if (chartRefBMI.value && bmiSeries.length) {
+    const bmiChart = echarts.init(chartRefBMI.value);
+    bmiChart.setOption(
+      buildChartOption(bmiSeries, bmiBandList, "BMI 曲线", "kg/m²", axisMin, axisMax),
       true
     );
   }
@@ -636,6 +741,42 @@ function tagClass(color) {
       </div>
       <div class="card p-4">
         <div ref="chartRefWeight" style="width:100%;height:320px;"></div>
+      </div>
+    </div>
+
+    <!-- BMI 曲线 + 身体状态说明 -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-5">
+      <div v-if="records.length" class="card p-4">
+        <div ref="chartRefBMI" style="width:100%;height:300px;"></div>
+      </div>
+      <div v-if="currentBmiInfo" class="card p-4 border" :class="currentBmiInfo.advice.bg">
+        <div class="flex items-center justify-between mb-2 flex-wrap gap-2">
+          <div class="text-sm font-semibold text-slate-800">身体状态说明</div>
+          <span v-if="latestRecord" class="text-xs text-slate-400">{{ latestRecord.record_date }}</span>
+        </div>
+        <div class="flex items-center gap-3 mb-3 flex-wrap">
+          <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-semibold" :class="bmiColorClass">
+            {{ currentBmiInfo.assessment.label }}
+          </span>
+          <span class="text-xs text-slate-500">
+            BMI <strong class="font-mono text-slate-700">{{ latestBMI?.toFixed?.(1) ?? latestBMI }}</strong>
+            <span v-if="ageMonths != null" class="ml-1">· {{ ageDisplay(ageMonths) }}</span>
+          </span>
+        </div>
+        <p class="text-sm mb-1.5 leading-relaxed" :class="currentBmiInfo.advice.tone">
+          {{ currentBmiInfo.advice.desc }}
+        </p>
+        <p class="text-xs text-slate-600 leading-relaxed mb-2">
+          <span class="font-medium text-slate-700">建议：</span>{{ currentBmiInfo.advice.advice }}
+        </p>
+        <p class="text-[11px] text-slate-400">
+          依据：{{ currentBmiInfo.assessment.source }}
+          <template v-if="currentBmiInfo.assessment.cutoff">
+            ，本年龄超重界 <span class="font-mono">{{ currentBmiInfo.assessment.cutoff[0] }}</span> / 肥胖界
+            <span class="font-mono">{{ currentBmiInfo.assessment.cutoff[1] }}</span>
+          </template>
+          <span v-else>（百分位法，阈值随年龄/性别自动判定）</span>
+        </p>
       </div>
     </div>
 
