@@ -19,6 +19,7 @@ class Child(Base):
     avatar_color: Mapped[str] = mapped_column(String(16), default="#6366f1")  # 头像颜色
     birth_date: Mapped[Optional[date]] = mapped_column(Date, nullable=True)
     notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    gender: Mapped[Optional[str]] = mapped_column(String(8), nullable=True)  # "male"/"female"/None（向后兼容）
     subjects: Mapped[list] = mapped_column(JSON, default=list)  # 关注的科目列表
     family_id: Mapped[Optional[int]] = mapped_column(
         ForeignKey("families.id", ondelete="CASCADE"), nullable=True, index=True

@@ -27,7 +27,7 @@ export function computeBMI(heightCm, weightKg) {
 }
 
 /**
- * BMI category based on WS/T 586-2018 (6-18岁) or approximate (<6岁).
+ * BMI category based on WS/T 586-2018 (6-18岁) or WS/T 423-2022 (<7岁).
  * Returns { category, label, color, source }
  */
 export function assessBMI(bmi, gender, ageMonths) {
@@ -36,12 +36,16 @@ export function assessBMI(bmi, gender, ageMonths) {
   }
   const g = (gender || "male").toLowerCase();
   if (ageMonths <= 83) {
-    return {
-      category: "approximate",
-      label: "需医生评估",
-      color: "info",
-      source: "WS/T 423-2022（0-7 岁建议用 BMI 百分位表）",
-    };
+    // 0-83 月: WS/T 423-2022 百分位法
+    const row = _STANDARDS?.bmi_0_83_months?.[g]?.[String(ageMonths)];
+    if (!row) return { category: "unknown", label: "-", color: "default", source: "-" };
+    const [p3, p15, p50, p85, p97] = row;
+    if (bmi < p3) return { category: "thin", label: "偏瘦", color: "info", source: "WS/T 423-2022（百分位法）" };
+    if (bmi < p15) return { category: "thin", label: "偏瘦", color: "info", source: "WS/T 423-2022（百分位法）" };
+    if (bmi <= p50) return { category: "normal", label: "正常", color: "success", source: "WS/T 423-2022（百分位法）" };
+    if (bmi <= p85) return { category: "normal", label: "正常", color: "success", source: "WS/T 423-2022（百分位法）" };
+    if (bmi < p97) return { category: "overweight", label: "偏胖", color: "warning", source: "WS/T 423-2022（百分位法）" };
+    return { category: "obese", label: "肥胖", color: "danger", source: "WS/T 423-2022（百分位法）" };
   }
   if (ageMonths > 216) {
     return { category: "unknown", label: "-", color: "default", source: "-" };

@@ -14,6 +14,7 @@ class ChildBase(BaseModel):
     avatar_color: str = "#6366f1"
     birth_date: Optional[date] = None
     notes: Optional[str] = None
+    gender: Optional[str] = Field(None, description="male/female")
     subjects: List[str] = Field(default_factory=lambda: ["语文", "数学", "英语"])
 
 
@@ -28,6 +29,7 @@ class ChildUpdate(BaseModel):
     avatar_color: Optional[str] = None
     birth_date: Optional[date] = None
     notes: Optional[str] = None
+    gender: Optional[str] = None
     subjects: Optional[List[str]] = None
 
 

@@ -8,6 +8,7 @@ from decimal import Decimal, InvalidOperation
 from typing import Literal
 
 from .growth_standards import (
+    BMI_0_83,
     BMI_CUTOFFS_6_18,
     HEIGHT_0_83,
     HEIGHT_7_18,
@@ -178,19 +179,34 @@ def assess_bmi(bmi: float | None, gender: Gender, age_months: int | None) -> dic
     if not b or age_months is None:
         return {"category": "unknown", "label": "-", "color": "default", "cutoff": None, "source": "-"}
     if age_months <= 83:
-        # 0-83 月: 用 WS/T 423-2022 的 BMI 百分位（简化：看 P50 附近）
-        # 完整实现需要 BMI 百分位表，这里先用近似规则
-        # 0-5 岁 WHO 规则：BMI > +2SD 为肥胖，> +1SD 为超重
-        # 由于没有完整的 0-83 月 BMI 百分位表，这里返回近似结果
+        # 0-83 月: WS/T 423-2022 BMI 百分位法
+        # 映射: <P15 偏瘦, P15-P85 正常, P85-P97 超重, ≥P97 肥胖
+        row = BMI_0_83.get(gender, {}).get(age_months)
+        if not row:
+            return {"category": "unknown", "label": "-", "color": "default", "cutoff": None, "source": "-"}
+        p3, p15, _p50, p85, p97 = row
+        if b < p15:
+            cat, label, color = "thin", "偏瘦", "info"
+            pct = round(3 + (b - p3) / (p15 - p3) * 12, 1) if p15 > p3 else 3
+        elif b <= p85:
+            cat, label, color = "normal", "正常", "success"
+            pct = round(15 + (b - p15) / (p85 - p15) * 70, 1) if p85 > p15 else 15
+        elif b < p97:
+            cat, label, color = "overweight", "超重", "warning"
+            pct = round(85 + (b - p85) / (p97 - p85) * 12, 1) if p97 > p85 else 85
+        else:
+            cat, label, color = "obese", "肥胖", "danger"
+            pct = 97.0
         return {
-            "category": "approximate",
-            "label": "需医生评估",
-            "color": "info",
+            "category": cat,
+            "label": label,
+            "color": color,
             "cutoff": None,
-            "source": "WS/T 423-2022（0-7 岁需完整 BMI 百分位表）",
+            "source": "WS/T 423-2022（百分位法）",
+            "percentile": pct,
         }
     elif age_months <= 216:
-        # 6-18 岁: WS/T 586-2018
+        # 6-18 岁: WS/T 586-2018 超重/肥胖切点
         age_str = str(round(age_months / 12 * 2) / 2)  # nearest 0.5
         cutoff = BMI_CUTOFFS_6_18.get(gender, {}).get(age_str)
         if not cutoff:

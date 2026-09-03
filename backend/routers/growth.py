@@ -17,6 +17,7 @@ from utils.growth_assessor import (
     get_standard_description,
 )
 from utils.growth_standards import (
+    BMI_0_83,
     BMI_CUTOFFS_6_18,
     HEIGHT_0_83,
     HEIGHT_7_18,
@@ -47,6 +48,7 @@ def get_standards():
         ],
         "height_0_83_months": HEIGHT_0_83,  # type: ignore[return-value]
         "weight_0_83_months": WEIGHT_0_83,  # type: ignore[return-value]
+        "bmi_0_83_months": BMI_0_83,  # type: ignore[return-value]
         "bmi_cutoffs_6_18": BMI_CUTOFFS_6_18,  # type: ignore[return-value]
         "height_7_18_years": HEIGHT_7_18,  # type: ignore[return-value]
         "weight_7_18_years": WEIGHT_7_18,  # type: ignore[return-value]
@@ -73,10 +75,8 @@ async def list_by_child(
         return []
 
     # Attach derived assessments (BMI auto-calc + percentile ratings)
-    # NOTE: Child model doesn't have a gender field yet (deferred).
-    # Default to "male" for now; future enhancement: add Child.gender column.
     child = await db.get(Child, child_id)
-    gender = "male"
+    gender = (child.gender if child and child.gender else "male").lower()
 
     enriched = []
     for r in records:
