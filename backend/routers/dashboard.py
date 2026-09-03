@@ -1,4 +1,7 @@
 """家长看板 / Dashboard 数据路由"""
+import time
+from typing import Any
+
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -17,6 +20,34 @@ from utils.analysis import (
 
 router = APIRouter(prefix="/api/dashboard", tags=["家长看板"])
 
+# 看板聚合查询缓存：TTL=60s，避免每次打开都重算「最近 30 天」统计
+# key = (child_id, cache_version)，TTL 到期或显式 invalidate 后重算
+_DASHBOARD_CACHE: dict[tuple[int, str], tuple[float, Any]] = {}
+_DASHBOARD_TTL = 60.0
+
+
+def _dashboard_cache_get(child_id: int, key: str = "v1") -> Any | None:
+    """读看板缓存。命中且未过期 → 返回；否则 None。"""
+    full_key = (child_id, key)
+    entry = _DASHBOARD_CACHE.get(full_key)
+    if entry is None:
+        return None
+    expires_at, value = entry
+    if expires_at < time.time():
+        _DASHBOARD_CACHE.pop(full_key, None)
+        return None
+    return value
+
+
+def _dashboard_cache_put(child_id: int, value: Any, key: str = "v1") -> None:
+    """写看板缓存（覆盖写）。"""
+    _DASHBOARD_CACHE[(child_id, key)] = (time.time() + _DASHBOARD_TTL, value)
+
+
+def invalidate_dashboard_cache(child_id: int) -> None:
+    """子数据变更（考试/作业/身高体重录入）后调用，清掉该孩子看板缓存。"""
+    _DASHBOARD_CACHE.pop((child_id, "v1"), None)
+
 
 @router.get("/{child_id}", response_model=DashboardData)
 async def get_dashboard(
@@ -25,6 +56,12 @@ async def get_dashboard(
     db: AsyncSession = Depends(get_db),
 ):
     assert_child_access(accessible, child_id)
+
+    # 缓存命中直接返回（60s 内不重算）
+    cached = _dashboard_cache_get(child_id)
+    if cached is not None:
+        return cached
+
     child = await db.get(Child, child_id)
     if not child:
         raise HTTPException(404, "孩子档案不存在")
@@ -43,7 +80,7 @@ async def get_dashboard(
     weak = detect_weak_subjects(stats)
     recent = sorted(exams, key=lambda x: x.exam_date, reverse=True)[:10]
 
-    return DashboardData(
+    dashboard = DashboardData(
         child_id=child.id,
         child_name=child.name,
         total_exams=len(exams),
@@ -55,6 +92,9 @@ async def get_dashboard(
         trend_data=build_trend_data(exams),
         action_suggestions=build_action_suggestions(exams, stats, weak),
     )
+    # 写入缓存（60s TTL）
+    _dashboard_cache_put(child_id, dashboard)
+    return dashboard
 
 
 @router.get("/compare/all", response_model=CompareData)
