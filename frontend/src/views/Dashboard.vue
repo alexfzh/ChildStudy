@@ -115,8 +115,8 @@ const trendBadge = (t) => `badge-${t === "up" ? "up" : t === "down" ? "down" : "
 // ============ 生长发育摘要 ============
 const latestGrowth = computed(() => growthRecords.value[0] || null);
 const growthCount = computed(() => growthRecords.value.length);
-const latestVisionLeft = computed(() => latestGrowth?.vision_left);
-const latestVisionRight = computed(() => latestGrowth?.vision_right);
+const latestVisionLeft = computed(() => latestGrowth.value?.vision_left);
+const latestVisionRight = computed(() => latestGrowth.value?.vision_right);
 
 // ============ 社交情感摘要 ============
 const latestSocial = computed(() => socialRecords.value[0] || null);
