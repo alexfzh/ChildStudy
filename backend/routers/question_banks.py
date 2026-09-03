@@ -101,7 +101,7 @@ async def get_bank(bank_id: int, db: AsyncSession = Depends(get_db)):
 
 
 @router.put("/{bank_id}", response_model=QuestionBankOut)
-async def update_bank(bank_id: int, data: QuestionBankUpdate, db: AsyncSession = Depends(get_db)):
+async def update_bank(bank_id: int, data: QuestionBankUpdate, db: AsyncSession = Depends(get_db), _parent=Depends(require_parent)):
     """更新题库分组"""
     bank = await db.get(QuestionBank, bank_id)
     if not bank:
@@ -117,7 +117,7 @@ async def update_bank(bank_id: int, data: QuestionBankUpdate, db: AsyncSession =
 
 
 @router.delete("/{bank_id}", response_model=OkResponse)
-async def delete_bank(bank_id: int, db: AsyncSession = Depends(get_db)):
+async def delete_bank(bank_id: int, db: AsyncSession = Depends(get_db), _parent=Depends(require_parent)):
     """删除题库分组（级联删除题目）"""
     bank = await db.get(QuestionBank, bank_id)
     if not bank:
@@ -153,7 +153,7 @@ async def list_questions(
 
 
 @router.post("/{bank_id}/questions", response_model=QuestionOut)
-async def create_question(bank_id: int, data: QuestionCreate, db: AsyncSession = Depends(get_db)):
+async def create_question(bank_id: int, data: QuestionCreate, db: AsyncSession = Depends(get_db), _parent=Depends(require_parent)):
     """向题库添加题目"""
     bank = await db.get(QuestionBank, bank_id)
     if not bank:
@@ -167,7 +167,7 @@ async def create_question(bank_id: int, data: QuestionCreate, db: AsyncSession =
 
 
 @router.put("/{bank_id}/questions/{question_id}", response_model=QuestionOut)
-async def update_question(bank_id: int, question_id: int, data: QuestionUpdate, db: AsyncSession = Depends(get_db)):
+async def update_question(bank_id: int, question_id: int, data: QuestionUpdate, db: AsyncSession = Depends(get_db), _parent=Depends(require_parent)):
     """更新题目"""
     q = await db.get(Question, question_id)
     if not q or q.bank_id != bank_id:
@@ -180,7 +180,7 @@ async def update_question(bank_id: int, question_id: int, data: QuestionUpdate, 
 
 
 @router.delete("/{bank_id}/questions/{question_id}", response_model=OkResponse)
-async def delete_question(bank_id: int, question_id: int, db: AsyncSession = Depends(get_db)):
+async def delete_question(bank_id: int, question_id: int, db: AsyncSession = Depends(get_db), _parent=Depends(require_parent)):
     """删除题目"""
     q = await db.get(Question, question_id)
     if not q or q.bank_id != bank_id:

@@ -6,6 +6,7 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from database import get_db
+from dependencies import require_parent
 from models import KnowledgePoint, Question, QuestionKnowledgePoint
 from schemas import (
     OkResponse,
@@ -61,7 +62,7 @@ async def list_questions_for_kp(kp_id: int, db: AsyncSession = Depends(get_db)):
 
 
 @router.post("/question/{question_id}", response_model=OkResponse)
-async def link_kps_to_question(question_id: int, payload: List[QuestionKPLink], db: AsyncSession = Depends(get_db)):
+async def link_kps_to_question(question_id: int, payload: List[QuestionKPLink], db: AsyncSession = Depends(get_db), _parent=Depends(require_parent)):
     """为题目关联 KP 标签（覆盖模式：删旧 → 插新）"""
     q = await db.get(Question, question_id)
     if not q:
@@ -89,7 +90,7 @@ async def link_kps_to_question(question_id: int, payload: List[QuestionKPLink], 
 
 
 @router.post("/bulk", response_model=OkResponse)
-async def bulk_link(payload: List[QuestionKPBulkLink], db: AsyncSession = Depends(get_db)):
+async def bulk_link(payload: List[QuestionKPBulkLink], db: AsyncSession = Depends(get_db), _parent=Depends(require_parent)):
     """批量关联 Question ↔ KP（覆盖模式）"""
     total = 0
     for item in payload:

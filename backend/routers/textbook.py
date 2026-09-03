@@ -6,6 +6,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from database import get_db
+from dependencies import require_parent
 from models import Question, QuestionUnit, TextbookUnit, TextbookVersion
 from schemas import (
     OkResponse,
@@ -79,7 +80,7 @@ async def get_question_units(question_id: int, db: AsyncSession = Depends(get_db
 
 
 @router.post("/questions/{question_id}/units", response_model=OkResponse)
-async def link_question_to_units(question_id: int, payload: list[QuestionUnitLink], db: AsyncSession = Depends(get_db)):
+async def link_question_to_units(question_id: int, payload: list[QuestionUnitLink], db: AsyncSession = Depends(get_db), _parent=Depends(require_parent)):
     q = await db.get(Question, question_id)
     if not q:
         raise HTTPException(404, "题目不存在")

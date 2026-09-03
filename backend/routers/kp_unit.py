@@ -6,6 +6,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from database import get_db
+from dependencies import require_parent
 from models import KnowledgePoint, KnowledgePointUnit, TextbookUnit
 from schemas import (
     KnowledgePointUnitBulkLink,
@@ -63,7 +64,7 @@ async def list_points_for_unit(unit_id: int, db: AsyncSession = Depends(get_db))
 
 
 @router.post("/point/{point_id}", response_model=OkResponse)
-async def link_point_to_units(point_id: int, payload: List[KnowledgePointUnitLink], db: AsyncSession = Depends(get_db)):
+async def link_point_to_units(point_id: int, payload: List[KnowledgePointUnitLink], db: AsyncSession = Depends(get_db), _parent=Depends(require_parent)):
     p = await db.get(KnowledgePoint, point_id)
     if not p:
         raise HTTPException(404, "知识点不存在")
@@ -88,7 +89,7 @@ async def link_point_to_units(point_id: int, payload: List[KnowledgePointUnitLin
 
 
 @router.post("/bulk", response_model=OkResponse)
-async def bulk_link(payload: List[KnowledgePointUnitBulkLink], db: AsyncSession = Depends(get_db)):
+async def bulk_link(payload: List[KnowledgePointUnitBulkLink], db: AsyncSession = Depends(get_db), _parent=Depends(require_parent)):
     """批量关联 KP ↔ Unit（覆盖模式：删旧 → 插新）"""
     total = 0
     for item in payload:
