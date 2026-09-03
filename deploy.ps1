@@ -4,6 +4,7 @@
 #   .\deploy.ps1
 #
 # 前置：先把本地更新后的整个 ChildStudy 文件夹复制到 C:\ChildStudy\ 覆盖
+# 适用范围：首次部署 + 后续更新（自动检测 venv / node_modules / 主进程）
 
 $ErrorActionPreference = "Stop"
 $ProjectRoot = "C:\ChildStudy"
@@ -23,7 +24,18 @@ if (-not (Test-Path (Join-Path $BackendDir "main.py"))) {
 }
 Write-Host "项目根目录：$ProjectRoot" -ForegroundColor Green
 
-# ---------- 1. 后端依赖 ----------
+# ---------- 1. 备份数据库 ----------
+Write-Step "备份数据库（防升级翻车）"
+$dbPath = Join-Path $BackendDir "data\childstudy.db"
+if (Test-Path $dbPath) {
+    $backupPath = "$dbPath.bak-$(Get-Date -Format 'yyyyMMdd-HHmmss')"
+    Copy-Item $dbPath $backupPath
+    Write-Host "已备份到 $backupPath" -ForegroundColor Green
+} else {
+    Write-Host "数据库文件不存在（首次部署？）" -ForegroundColor Yellow
+}
+
+# ---------- 2. 后端依赖 ----------
 Write-Step "升级后端依赖（pip install -r requirements.txt）"
 Set-Location $BackendDir
 $venvPython = Join-Path $BackendDir ".venv\Scripts\python.exe"
@@ -38,7 +50,7 @@ if (-not (Test-Path $venvPython)) {
     & $venvPip install -r requirements.txt
 }
 
-# ---------- 2. 前端构建 ----------
+# ---------- 3. 前端构建 ----------
 Write-Step "构建前端（npm install + npm run build）"
 Set-Location $FrontendDir
 if (-not (Test-Path "node_modules")) {
@@ -55,7 +67,7 @@ if ($LASTEXITCODE -ne 0) {
     exit 1
 }
 
-# ---------- 3. 杀掉旧进程 ----------
+# ---------- 4. 杀掉旧进程 ----------
 Write-Step "重启后端服务"
 $oldProcs = Get-CimInstance Win32_Process -Filter "CommandLine LIKE '%main.py%'" -ErrorAction SilentlyContinue
 if ($oldProcs) {
@@ -68,7 +80,7 @@ if ($oldProcs) {
     Write-Host "未检测到运行中的 main.py 进程（首次部署？）" -ForegroundColor Gray
 }
 
-# ---------- 4. 启动 ----------
+# ---------- 5. 启动 ----------
 Write-Step "启动后端"
 Set-Location $BackendDir
 Start-Process -FilePath $venvPython -ArgumentList "main.py" -WorkingDirectory $BackendDir -WindowStyle Hidden
