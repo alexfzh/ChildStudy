@@ -1,0 +1,29 @@
+# ChildStudy 反向代理 + 自动 HTTPS（Caddyfile）
+#
+# 适用：把系统暴露到公网 / 跨设备访问时，前置 Caddy 提供 TLS 终止 + 安全头 + 真实 IP 透传。
+# 前置条件：一个已解析到本机公网 IP 的域名（Caddy 会自动申请并续期 Let's Encrypt 证书）。
+# 用法：
+#   1. 安装 Caddy：https://caddyserver.com/docs/install
+#   2. 把下面 your.domain.com 改成你的真实域名
+#   3. 后端仍以 APP_HOST=127.0.0.1 在 8000 运行（Caddy 独占 80/443，而非直接暴露 8000）
+#   4. 启动：caddy run --config deploy/caddy/Caddyfile
+#
+# 注意：本模板仅做 TLS 终止与基础安全头。暴力破解防护仍依赖后端登录防爆破 +
+#       限流中间件（RATE_LIMIT_PER_MINUTE）；公网高并发建议再加 fail2ban。
+
+your.domain.com {
+    reverse_proxy 127.0.0.1:8000 {
+        # 透传真实客户端 IP，后端限流 / 防爆破据此判断（而非 Caddy 自身 IP）
+        header_up X-Real-IP {remote_host}
+        header_up X-Forwarded-For {remote_host}
+        header_up X-Forwarded-Proto {scheme}
+    }
+
+    # 安全响应头
+    header {
+        Strict-Transport-Security "max-age=31536000; includeSubDomains"
+        X-Content-Type-Options "nosniff"
+        X-Frame-Options "DENY"
+        Referrer-Policy "no-referrer"
+    }
+}

@@ -1,0 +1,58 @@
+name: CI
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+
+jobs:
+  backend:
+    strategy:
+      fail-fast: false
+      matrix:
+        # 跨平台:开发/部署主力是 Windows,Ubuntu 兜底 Linux 部署
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      # 注意:ruff/pytest 在 requirements-dev.txt,漏装会导致 lint/test 步骤必挂
+      - name: Install deps (prod + dev)
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt -r requirements-dev.txt
+      # 统一用 python -m 调用,规避 Windows(.venv/Scripts)与 Linux(.venv/bin)路径差异
+      - name: Ruff lint
+        run: python -m ruff check .
+      - name: Pytest
+        run: python -m pytest -q
+      - name: Schema-router audit
+        run: python scripts/audit-schema-router.py
+
+  frontend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      # audit:routes 是 python 脚本,需要 python
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - name: Install deps
+        run: npm ci
+      - name: Build
+        run: npm run build
+      - name: Route audit
+        run: npm run audit:routes
