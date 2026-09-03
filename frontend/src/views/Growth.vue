@@ -791,7 +791,7 @@ function tagClass(color) {
             <tr
               v-for="(row, i) in yearlyStandards"
               :key="row.months"
-              class="border-b border-slate-50"
+              class="border-b border-slate-50 transition hover:bg-slate-50"
               :class="currentMonthIndex === i ? 'bg-indigo-50' : ''"
             >
               <td class="py-2 px-3 font-medium" :class="currentMonthIndex === i ? 'text-indigo-700' : 'text-slate-700'">
