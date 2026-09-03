@@ -148,10 +148,15 @@ async def import_exams(
     1. query 带 child_id：整批导入到该孩子（须在 accessible 内）
     2. query 不带 child_id：CSV 必须包含 child_id 列（每行校验 accessible）
     """
+    from config import settings
     if not file.filename.endswith(".csv"):
         raise HTTPException(400, "仅支持 CSV 文件")
 
-    content = (await file.read()).decode("utf-8-sig")
+    content = await file.read()
+    max_bytes = int(settings.max_upload_size_mb) * 1024 * 1024
+    if len(content) > max_bytes:
+        raise HTTPException(413, f"文件超过 {settings.max_upload_size_mb}MB 限制（实际 {len(content)/1024/1024:.1f}MB）")
+    content = content.decode("utf-8-sig")
     reader = csv.DictReader(io.StringIO(content))
 
     required_headers = {"subject", "exam_name", "score", "exam_date"}
@@ -230,10 +235,15 @@ async def import_homeworks(
     accessible: set[int] = Depends(get_accessible_child_ids),
 ):
     """上传作业 CSV 批量导入"""
+    from config import settings
     if not file.filename.endswith(".csv"):
         raise HTTPException(400, "仅支持 CSV 文件")
 
-    content = (await file.read()).decode("utf-8-sig")
+    content = await file.read()
+    max_bytes = int(settings.max_upload_size_mb) * 1024 * 1024
+    if len(content) > max_bytes:
+        raise HTTPException(413, f"文件超过 {settings.max_upload_size_mb}MB 限制（实际 {len(content)/1024/1024:.1f}MB）")
+    content = content.decode("utf-8-sig")
     reader = csv.DictReader(io.StringIO(content))
 
     required_headers = {"subject", "title", "homework_date"}
