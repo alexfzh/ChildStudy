@@ -234,29 +234,6 @@ const currentMonthIndex = computed(() => {
   return yearlyStandards.value.findIndex((r) => r.months === am);
 });
 
-const pickedAge = ref(null);
-const pickedAgeLabel = computed(() => {
-  if (pickedAge.value == null) return null;
-  return ageDisplay(pickedAge.value);
-});
-const pickedHeightStd = computed(() => {
-  if (pickedAge.value == null) return null;
-  const row = heightStdRow(pickedAge.value);
-  return row ? (row.length >= 5
-    ? { p3: row[0], p15: row[1], p50: row[2], p85: row[3], p97: row[4] }
-    : { p3: row[0], p50: row[1], p97: row[2] }) : null;
-});
-const pickedWeightStd = computed(() => {
-  if (pickedAge.value == null) return null;
-  const row = weightStdRow(pickedAge.value);
-  return row ? (row.length >= 5
-    ? { p3: row[0], p15: row[1], p50: row[2], p85: row[3], p97: row[4] }
-    : { p3: row[0], p50: row[1], p97: row[2] }) : null;
-});
-function onPickAge(months) {
-  pickedAge.value = months;
-}
-
 // ---------- Charts ----------
 const chartRefHeight = ref(null);
 const chartRefWeight = ref(null);
@@ -790,7 +767,6 @@ function tagClass(color) {
               {{ (childStore.current?.gender || 'male') === 'male' ? '男童' : '女童' }} · WS/T 423-2022 + WS/T 611-2018
             </span>
           </div>
-          <div class="text-xs text-slate-500 mt-0.5">点击行查看该年龄的详细标准参考</div>
         </div>
       </div>
       <div class="overflow-x-auto">
@@ -815,9 +791,8 @@ function tagClass(color) {
             <tr
               v-for="(row, i) in yearlyStandards"
               :key="row.months"
-              class="border-b border-slate-50 cursor-pointer hover:bg-slate-50 transition"
+              class="border-b border-slate-50"
               :class="currentMonthIndex === i ? 'bg-indigo-50' : ''"
-              @click="onPickAge(row.months)"
             >
               <td class="py-2 px-3 font-medium" :class="currentMonthIndex === i ? 'text-indigo-700' : 'text-slate-700'">
                 {{ row.label }}
@@ -836,74 +811,6 @@ function tagClass(color) {
             </tr>
           </tbody>
         </table>
-      </div>
-    </div>
-
-    <!-- 标准查询器: 点击对照表行后显示 -->
-    <div v-if="pickedAge != null" class="card p-4 mb-5 border-l-4 border-indigo-400">
-      <div class="flex items-start justify-between mb-2 flex-wrap gap-2">
-        <div>
-          <div class="text-sm font-semibold text-slate-800">
-            📍 查询：{{ pickedAgeLabel }}
-            <span class="text-xs text-slate-400 ml-2">
-              {{ (childStore.current?.gender || 'male') === 'male' ? '男童' : '女童' }}
-            </span>
-          </div>
-          <div class="text-xs text-slate-500 mt-0.5">点击下方表格任意行切换</div>
-        </div>
-        <button class="text-xs text-slate-500 hover:text-slate-700" @click="pickedAge = null">清除 ✕</button>
-      </div>
-      <div v-if="pickedHeightStd || pickedWeightStd" class="grid grid-cols-1 md:grid-cols-2 gap-4 mt-3">
-        <div v-if="pickedHeightStd" class="bg-slate-50 rounded p-3">
-          <div class="text-xs text-slate-500 mb-1">身高 (cm)</div>
-          <div class="grid grid-cols-5 gap-2 text-center">
-            <div>
-              <div class="text-xs text-slate-400">P3</div>
-              <div class="font-mono text-slate-700 mt-0.5">{{ pickedHeightStd.p3 }}</div>
-            </div>
-            <div v-if="pickedHeightStd.p15 != null">
-              <div class="text-xs text-slate-400">P15</div>
-              <div class="font-mono text-slate-700 mt-0.5">{{ pickedHeightStd.p15 }}</div>
-            </div>
-            <div>
-              <div class="text-xs text-slate-400">P50</div>
-              <div class="font-mono font-semibold text-slate-800 mt-0.5">{{ pickedHeightStd.p50 }}</div>
-            </div>
-            <div v-if="pickedHeightStd.p85 != null">
-              <div class="text-xs text-slate-400">P85</div>
-              <div class="font-mono text-slate-700 mt-0.5">{{ pickedHeightStd.p85 }}</div>
-            </div>
-            <div>
-              <div class="text-xs text-slate-400">P97</div>
-              <div class="font-mono text-slate-700 mt-0.5">{{ pickedHeightStd.p97 }}</div>
-            </div>
-          </div>
-        </div>
-        <div v-if="pickedWeightStd" class="bg-slate-50 rounded p-3">
-          <div class="text-xs text-slate-500 mb-1">体重 (kg)</div>
-          <div class="grid grid-cols-5 gap-2 text-center">
-            <div>
-              <div class="text-xs text-slate-400">P3</div>
-              <div class="font-mono text-slate-700 mt-0.5">{{ pickedWeightStd.p3 }}</div>
-            </div>
-            <div v-if="pickedWeightStd.p15 != null">
-              <div class="text-xs text-slate-400">P15</div>
-              <div class="font-mono text-slate-700 mt-0.5">{{ pickedWeightStd.p15 }}</div>
-            </div>
-            <div>
-              <div class="text-xs text-slate-400">P50</div>
-              <div class="font-mono font-semibold text-slate-800 mt-0.5">{{ pickedWeightStd.p50 }}</div>
-            </div>
-            <div v-if="pickedWeightStd.p85 != null">
-              <div class="text-xs text-slate-400">P85</div>
-              <div class="font-mono text-slate-700 mt-0.5">{{ pickedWeightStd.p85 }}</div>
-            </div>
-            <div>
-              <div class="text-xs text-slate-400">P97</div>
-              <div class="font-mono text-slate-700 mt-0.5">{{ pickedWeightStd.p97 }}</div>
-            </div>
-          </div>
-        </div>
       </div>
     </div>
 
