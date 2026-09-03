@@ -1,5 +1,6 @@
 """pytest 公共 fixtures：异步内存 DB + session + 依赖覆盖"""
 import asyncio
+import os
 import pathlib
 
 # 让 backend/ 在 sys.path 里（pytest.ini 的 rootpath = backend/）
@@ -11,6 +12,10 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 from sqlalchemy.pool import StaticPool
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent.parent))
+
+# 测试用强随机密钥：必须在导入 config 之前写入环境变量，
+# 否则 config.Settings 的 fail-fast 会因默认占位密钥而拒绝启动。
+os.environ.setdefault("JWT_SECRET", "test-secret-not-for-production-0123456789abcdef")
 
 from database import Base
 from models import *  # noqa: F403  — 确保所有模型注册到 Base.metadata
