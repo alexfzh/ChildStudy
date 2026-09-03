@@ -36,6 +36,9 @@ class GrowthRecordUpdate(BaseModel):
 class GrowthRecordOut(GrowthRecordBase):
     id: int
     created_at: datetime
+    bmi_assessment: dict | None = None
+    height_assessment: dict | None = None
+    weight_assessment: dict | None = None
     model_config = ConfigDict(from_attributes=True)
 
 
