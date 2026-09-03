@@ -2,7 +2,7 @@
 
 > 隐私优先的家庭学情追踪平台 · 数据完全本地存储 · AI 分析靠"导出→外部AI→粘回"
 
-![version](https://img.shields.io/badge/version-1.7.3-blue) ![license](https://img.shields.io/badge/license-MIT-green) ![privacy](https://img.shields.io/badge/privacy-100%25%20local-orange)
+![version](https://img.shields.io/badge/version-1.8.0-blue) ![license](https://img.shields.io/badge/license-MIT-green) ![privacy](https://img.shields.io/badge/privacy-100%25%20local-orange)
 
 ## ✨ 核心理念
 
@@ -145,6 +145,11 @@ ChildStudy/
 │   │   ├── kp_progress.py        #   KP 细粒度掌握度
 │   │   ├── import_export.py      #   导入/导出（CSV）
 │   │   └── system.py             #   版本 + 升级日志
+│   ├── scripts/                  # 运维脚本
+│   │   ├── seed/                 #   种子数据脚本（原 seeds/，已迁移）
+│   │   └── backup_db.py          #   SQLite 自动备份
+│   ├── migrations/               # Alembic 版本化迁移（默认未启用）
+│   ├── alembic.ini               # Alembic 配置
 │   ├── utils/
 │   │   ├── analysis.py           #   统计计算（趋势、雷达数据）
 │   │   └── grade.py              #   年级历史工具
@@ -339,6 +344,8 @@ ChildStudy/
 | `/api/kp-progress/child/{cid}/version/{vid}` | GET | 版本 KP 掌握度 |
 | `/api/import-export/exams` | GET/POST | 考试导入/导出（CSV） |
 | `/api/import-export/homeworks` | GET/POST | 作业导入/导出（CSV） |
+| `/api/project-works/{id}/image` | GET | 鉴权回取作品图片（校验归属） |
+| `/api/system/metrics` | GET | 基础可观测性指标（需登录） |
 
 完整交互式文档：启动后端后访问 `http://127.0.0.1:8000/docs`
 
@@ -441,7 +448,18 @@ cp backend/data/childstudy.db backend/data/backup-$(date +%Y%m%d).db
 |------|------|
 | 单机本地 | `APP_HOST=127.0.0.1` |
 | 家庭 LAN | `APP_HOST=0.0.0.0` + 路由器不开端口映射 |
-| 公网暴露 | ⚠️ **强烈不推荐**。如必须：前置 nginx + HTTPS + fail2ban + 限流 |
+| 公网暴露 | ⚠️ **强烈不推荐**。如必须：前置反向代理 + HTTPS（见 `deploy/caddy/Caddyfile`）+ fail2ban + 限流 |
+
+**反向代理 + HTTPS（公网/跨设备访问推荐）**：
+
+```bash
+# 1. 后端改为仅监听本机（不让 8000 直连公网）
+#    backend/.env → APP_HOST=127.0.0.1
+# 2. 用 Caddy 提供自动 TLS（把下面 your.domain.com 改成你的域名）
+caddy run --config deploy/caddy/Caddyfile
+```
+
+Caddy 自动申请/续期 Let's Encrypt 证书，并透传真实客户端 IP（后端限流/防爆破据此判断）。
 
 **不要**直接把 8000 端口暴露公网 —— 当前没有 rate limit、没有 HTTPS（JWT 明文传输）、没有 brute-force 防护（仅 IP 层 + 内存锁定）。
 
@@ -458,12 +476,52 @@ cd frontend && npm update
 
 关注 CVE：https://github.com/advisories （查询 fastapi / sqlalchemy / pydantic / vue / vite）。
 
+### 8. 持续集成（CI）
+
+仓库含 `.github/workflows/ci.yml`，每次 push / PR 自动执行：
+- `ruff check .`（代码风格 / 静态检查）
+- `pytest -q`（后端测试，conftest 已注入测试用 JWT_SECRET）
+
+本地提交前建议先本地跑一遍同样命令，避免 CI 红。
+
 ### 7. 已知限制（roadmap 跟踪）
 
 - [ ] 防爆破状态迁移到 SQLite（多 worker 安全）—— 见 `routers/auth.py:_login_fail`
 - [ ] Pydantic v3 移除 class-based `Config` 时的迁移（当前是 deprecation warning，不阻塞）
 - [ ] models.py 736 行 / schemas.py 1118 行过大，业务域拆分
 - [ ] routers/question_banks.py 935 行可拆 admin/practice
+## 🛡️ 进程守护与崩溃自启
+
+生产环境建议用进程管理器托管后端，避免终端关闭即停服、崩溃后不自愈。
+
+**Linux（systemd）** —— 新建 `/etc/systemd/system/childstudy.service`：
+
+```ini
+[Unit]
+Description=ChildStudy Backend
+After=network.target
+
+[Service]
+WorkingDirectory=/opt/childstudy/backend
+ExecStart=/opt/childstudy/backend/.venv/bin/python main.py
+Restart=always
+RestartSec=5
+User=childstudy
+Environment=APP_HOST=127.0.0.1
+
+[Install]
+WantedBy=multi-user.target
+```
+
+启用：`sudo systemctl enable --now childstudy`。`Restart=always` 保证崩溃自启。
+
+**Windows（任务计划）**：
+1. 任务计划程序 → 创建任务 → 触发器「登录时 / 启动时」
+2. 操作 → 启动程序：`backend\.venv\Scripts\python.exe`，参数 `main.py`，起始于 `backend` 目录
+3. 「设置」勾选「如果任务失败，重新启动」，间隔 1 分钟
+
+> 也可直接双击 `start.bat`（独立窗口，关闭窗口即停服，适合个人临时使用）。
+
 ## ⚙️ 环境变量（.env）
 
 ```env
