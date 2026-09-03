@@ -296,6 +296,18 @@ const historyOf = (childId) => childStore.gradeHistoryMap[childId] || [];
             💡 点选预设科目，或「+ 自定义」添加（如历史、化学）。录考试时只能从这些科目里选
           </div>
         </el-form-item>
+        <el-form-item label="出生日期">
+          <el-date-picker
+            v-model="form.birth_date"
+            type="date"
+            value-format="YYYY-MM-DD"
+            placeholder="选择孩子的出生日期"
+            class="w-full"
+          />
+          <div class="text-xs text-slate-400 mt-1">
+            💡 用于身高、体重、BMI 生长曲线查表与年龄计算
+          </div>
+        </el-form-item>
         <el-form-item label="性别">
           <el-radio-group v-model="form.gender">
             <el-radio-button :value="null">未填</el-radio-button>
