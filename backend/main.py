@@ -132,10 +132,15 @@ async def health():
 # 生长发育标准数据（公开，不涉及隐私）
 @app.get("/api/growth/standards")
 async def public_growth_standards():
-    from utils.growth_standards import (
-        BMI_0_83, BMI_CUTOFFS_6_18, HEIGHT_0_83, HEIGHT_7_18, WEIGHT_0_83, WEIGHT_7_18,
-    )
     from utils.growth_assessor import get_standard_description
+    from utils.growth_standards import (
+        BMI_0_83,
+        BMI_CUTOFFS_6_18,
+        HEIGHT_0_83,
+        HEIGHT_7_18,
+        WEIGHT_0_83,
+        WEIGHT_7_18,
+    )
     return {
         "schema_version": 1,
         "sources": [

@@ -36,6 +36,10 @@ jobs:
       # -X utf8 强制 UTF-8 输出,规避平台编码差异。
       - name: Schema-router audit
         run: python -X utf8 scripts/audit-schema-router.py
+      # 版本号一致性:强制 system.py/main.py/package.json/VERSION 四处相等,
+      # 根治 audit 指出的"版本号漂移"类问题(任一不同步则 CI 红)
+      - name: Version consistency audit
+        run: python -X utf8 scripts/check_version_consistency.py
 
   frontend:
     runs-on: ubuntu-latest
