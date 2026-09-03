@@ -218,7 +218,7 @@ function onPickAge(months) {
 const chartRefHeight = ref(null);
 const chartRefWeight = ref(null);
 
-function buildChartOption(seriesData, bands, title, unit) {
+function buildChartOption(seriesData, bands, title, unit, axisMin, axisMax) {
   return {
     title: title ? { text: title, left: "left", textStyle: { fontSize: 13, fontWeight: 600 } } : undefined,
     tooltip: {
@@ -242,13 +242,14 @@ function buildChartOption(seriesData, bands, title, unit) {
     legend: { top: 6, icon: "circle", textStyle: { fontSize: 11 } },
     grid: { top: 50, right: 16, bottom: 30, left: 40 },
     xAxis: {
-      type: "category",
+      type: "value",
       name: "月龄",
       nameLocation: "middle",
       nameGap: 24,
+      min: axisMin,
+      max: axisMax,
       axisLine: { lineStyle: { color: "#e2e8f0" } },
-      axisLabel: { color: "#64748b", fontSize: 11 },
-      data: seriesData.map((d) => d[0]),
+      axisLabel: { color: "#64748b", fontSize: 11, formatter: (v) => Math.round(v) },
     },
     yAxis: {
       type: "value",
@@ -264,6 +265,8 @@ function buildChartOption(seriesData, bands, title, unit) {
         data: b.data,
         symbol: "none",
         lineStyle: { width: 1, type: b.lineStyle || "dashed", color: b.color || "#cbd5e1" },
+        // 显式设置 itemStyle.color：图例色块取自 itemStyle，否则会回退默认调色板导致色块与线不一致
+        itemStyle: { color: b.color || "#cbd5e1" },
         z: 0,
         silent: true,
       })),
@@ -295,45 +298,70 @@ function renderCharts() {
     .sort((a, b) => a.months - b.months);
 
   if (!points.length) return;
-  const maxMonth = Math.max(...points.map((p) => p.months), 6);
+  const g = childGender.value;
+  const firstMonth = points[0].months;
+  const lastMonth = points[points.length - 1].months;
 
-  function getBand(month, metric) {
-    const table = standards.value[metric]?.[childGender.value];
-    if (!table) return null;
-    const keys = Object.keys(table).map(Number).sort((a, b) => a - b);
-    const nearest = keys.reduce((prev, curr) => (Math.abs(curr - month) < Math.abs(prev - month) ? curr : prev));
-    return table[nearest] || null;
-  }
+  // X 轴取孩子记录附近窗口，避免整段 0-83 空白；带与数据都用同一 value 轴。
+  const axisMin = Math.max(0, Math.floor((firstMonth - 8) / 6) * 6);
+  const axisMax = lastMonth + 8;
 
-  const heightBands = [];
-  const weightBands = [];
-  const bandDefs = [
-    { name: "P97", idx: 4, color: "#e2e8f0", lineStyle: "solid" },
-    { name: "P50", idx: 2, color: "#94a3b8", lineStyle: "dashed" },
-    { name: "P3", idx: 0, color: "#e2e8f0", lineStyle: "solid" },
-  ];
-
-  for (let m = 0; m <= maxMonth; m += 3) {
-    const h = getBand(m, "height_0_83_months") || getBand(m, "height_7_18_years");
-    const w = getBand(m, "weight_0_83_months") || getBand(m, "weight_7_18_years");
-    bandDefs.forEach((b) => {
-      if (h) heightBands.push([m, h[b.idx]]);
-      if (w) weightBands.push([m, w[b.idx]]);
-    });
-  }
-
-  const groupBands = (raw, names) => {
-    const result = [];
-    names.forEach((name, idx) => {
-      result.push({
-        name,
-        data: raw.filter((_, i) => i % names.length === idx),
-        color: bandDefs[idx].color,
-        lineStyle: bandDefs[idx].lineStyle,
-      });
-    });
-    return result;
+  /**
+   * 取指定月龄的标准 [P3, P50, P97]。
+   * 0-83 月走 WS/T 423（月表，P3/P15/P50/P85/P97 取 0/2/4）；
+   * 84 月以上走 WS/T 611（岁表，P3/P50/P97）——月龄必须 ÷12 换算成岁，
+   * 不能用月龄直接匹配岁的键（旧 bug）。
+   */
+  const stdTripletAt = (month) => {
+    const h0 = standards.value.height_0_83_months?.[g];
+    const h7 = standards.value.height_7_18_years?.[g];
+    const w0 = standards.value.weight_0_83_months?.[g];
+    const w7 = standards.value.weight_7_18_years?.[g];
+    const rowFor = (table, want) => {
+      if (!table) return null;
+      const keys = Object.keys(table).map(Number).sort((a, b) => a - b);
+      if (want < keys[0] || want > keys[keys.length - 1]) return null;
+      const nearest = keys.reduce((p, c) => (Math.abs(c - want) < Math.abs(p - want) ? c : p));
+      return table[nearest];
+    };
+    const pick = (r) =>
+      !r ? null : r.length >= 5 ? { p3: r[0], p50: r[2], p97: r[4] } : { p3: r[0], p50: r[1], p97: r[2] };
+    const isUnder7 = month <= 83;
+    return {
+      height: pick(isUnder7 ? rowFor(h0, month) : rowFor(h7, month / 12)),
+      weight: pick(isUnder7 ? rowFor(w0, month) : rowFor(w7, month / 12)),
+    };
   };
+
+  // 覆盖窗口内逐月生成参考带（P3/P50/P97 各一条）
+  const heightBands = { P3: [], P50: [], P97: [] };
+  const weightBands = { P3: [], P50: [], P97: [] };
+  for (let m = axisMin; m <= axisMax; m++) {
+    const t = stdTripletAt(m);
+    if (t.height) {
+      heightBands.P3.push([m, t.height.p3]);
+      heightBands.P50.push([m, t.height.p50]);
+      heightBands.P97.push([m, t.height.p97]);
+    }
+    if (t.weight) {
+      weightBands.P3.push([m, t.weight.p3]);
+      weightBands.P50.push([m, t.weight.p50]);
+      weightBands.P97.push([m, t.weight.p97]);
+    }
+  }
+  // P3/P50/P97 参考线：语义色（低=红、中位=黄、上界=绿），全部虚线便于肉眼区分。
+  const bandStyle = {
+    P3: { color: "#ef4444", lineStyle: "dashed" },
+    P50: { color: "#eab308", lineStyle: "dashed" },
+    P97: { color: "#22c55e", lineStyle: "dashed" },
+  };
+  const toBands = (map) =>
+    ["P97", "P50", "P3"].map((name) => ({
+      name,
+      data: map[name],
+      color: bandStyle[name].color,
+      lineStyle: bandStyle[name].lineStyle,
+    }));
 
   const hSeries = points.map((p) => [p.months, p.height]);
   const wSeries = points.map((p) => [p.months, p.weight]);
@@ -341,14 +369,14 @@ function renderCharts() {
   if (chartRefHeight.value) {
     const hChart = echarts.init(chartRefHeight.value);
     hChart.setOption(
-      buildChartOption(hSeries, groupBands(heightBands, ["P97", "P50", "P3"]), "身高曲线", "cm"),
+      buildChartOption(hSeries, toBands(heightBands), "身高曲线", "cm", axisMin, axisMax),
       true
     );
   }
   if (chartRefWeight.value) {
     const wChart = echarts.init(chartRefWeight.value);
     wChart.setOption(
-      buildChartOption(wSeries, groupBands(weightBands, ["P97", "P50", "P3"]), "体重曲线", "kg"),
+      buildChartOption(wSeries, toBands(weightBands), "体重曲线", "kg", axisMin, axisMax),
       true
     );
   }
