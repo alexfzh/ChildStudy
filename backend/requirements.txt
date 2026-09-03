@@ -10,3 +10,7 @@ starlette==1.6.0
 # 学情周报/月报 PDF 导出（v1.7.0）
 reportlab==5.0.1
 matplotlib==3.11.1
+
+# 数据库版本化迁移（v1.7.4+ 启用）
+# 骨架位于 backend/migrations/，启用步骤见 migrations/env.py 顶部注释
+alembic==1.19.1
