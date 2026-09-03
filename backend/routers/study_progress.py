@@ -85,11 +85,18 @@ async def update_progress_on_exercise(db: AsyncSession, child_id: int, exercise)
     if not unit_ids:
         return {"updated_units": [], "new_achievements": []}
 
+    # 批量预取（修复 N+1）：一次取全部相关 Unit 的题目映射 → unit_id -> {question_id}
+    qq_rows = (await db.execute(
+        select(QuestionUnit.unit_id, QuestionUnit.question_id)
+        .where(QuestionUnit.unit_id.in_(unit_ids))
+    )).all()
+    qids_by_unit: dict[int, set[int]] = {}
+    for uid, qid in qq_rows:
+        qids_by_unit.setdefault(uid, set()).add(qid)
+
     for unit_id in unit_ids:
         # 该 Unit 下所有关联题目
-        unit_qids = set((await db.execute(
-            select(QuestionUnit.question_id).where(QuestionUnit.unit_id == unit_id)
-        )).scalars().all())
+        unit_qids = qids_by_unit.get(unit_id, set())
 
         # 找出本场练习中归属本 Unit 的题目
         unit_qid_in_ex = unit_qids & set(question_ids)

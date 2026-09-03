@@ -5,7 +5,7 @@ from datetime import date, datetime, timedelta, timezone
 from typing import List
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy import and_, func, select
+from sqlalchemy import and_, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -67,15 +67,20 @@ async def _resolve_kps_by_names(
         return kps
 
     # 第二轮：模糊匹配（LIKE 包含/被包含）
+    # 批量预取（修复 N+1）：一次 OR-LIKE 取全部候选，Python 内按名字分组挑选
     fuzzy_kps: List[KnowledgePoint] = []
+    or_stmt = select(KnowledgePoint).where(
+        KnowledgePoint.subject == subject,
+        or_(*[KnowledgePoint.name.like(f"%{n}%") for n in leftover]),
+    )
+    all_cands = list((await db.execute(or_stmt)).scalars().unique().all())
+    cands_by_name: dict[str, List[KnowledgePoint]] = {}
+    for c in all_cands:
+        for n in leftover:
+            if n in c.name:  # 与 LIKE %n% 包含语义一致（中文场景）
+                cands_by_name.setdefault(n, []).append(c)
     for n in leftover:
-        like_stmt = select(KnowledgePoint).where(
-            and_(
-                KnowledgePoint.subject == subject,
-                KnowledgePoint.name.like(f"%{n}%"),
-            )
-        )
-        cands = list((await db.execute(like_stmt)).scalars().unique().all())
+        cands = cands_by_name.get(n, [])
         if cands:
             # 优先挑名字最短的（最贴合）
             cands.sort(key=lambda k: len(k.name))

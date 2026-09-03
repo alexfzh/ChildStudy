@@ -19,7 +19,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from database import get_db
-from models import Child, User
+from models import Child, RevokedToken, User
 from utils.security import decode_jwt
 
 
@@ -46,6 +46,14 @@ async def get_current_user(
     payload = decode_jwt(token, settings.jwt_secret)
     if not payload or "sub" not in payload:
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "登录凭证无效或已过期")
+    # 令牌吊销校验：服务端登出 / 改密后，对应 jti 会被写入 revoked_tokens，旧 token 立即失效
+    jti = payload.get("jti")
+    if jti:
+        revoked = (await db.execute(
+            select(RevokedToken).where(RevokedToken.jti == jti)
+        )).scalar_one_or_none()
+        if revoked:
+            raise HTTPException(status.HTTP_401_UNAUTHORIZED, "登录已失效，请重新登录")
     try:
         user_id = int(payload["sub"])
     except (TypeError, ValueError) as err:

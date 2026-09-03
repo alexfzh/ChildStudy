@@ -2,29 +2,29 @@
 
 POST /api/auth/setup  — 首次启动无 user 时调用，建家庭 + 建第一个家长账号
 POST /api/auth/login  — 用户名 + 密码 → 返回 JWT
-POST /api/auth/logout — 客户端清 token，服务端 noop（JWT 是 stateless）
+POST /api/auth/logout — 服务端吊销当前 token（写入 revoked_tokens，旧 token 立即失效）
 GET  /api/auth/me     — 返回当前 user + 可访问孩子列表
 GET  /api/auth/users  — 家长查询本家庭所有用户
 POST /api/auth/users  — 家长建子账号（家长或孩子）
 
-设计上：登出不做服务端 blacklist（增加 DB 表 + 复杂度，本地家庭工具不值得）；
-JWT 24h 过期 + 客户端清 token 足够。
+登出采用服务端黑名单（revoked_tokens 表）实现真正的令牌吊销：
+该表仅存 jti，体积可忽略；过期 token 由 JWT exp 自然淘汰。
 """
 import logging
 import time
 from datetime import datetime, timezone
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi import APIRouter, Depends, Header, HTTPException, Request, status
 from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from config import settings
 from database import get_db
-from dependencies import get_current_user, require_parent
-from models import Child, Family, LoginLock, User
-from utils.security import create_jwt, hash_password, verify_password
+from dependencies import _extract_bearer, get_current_user, require_parent
+from models import Child, Family, LoginLock, RevokedToken, User
+from utils.security import create_jwt, decode_jwt, hash_password, verify_password
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/auth", tags=["认证"])
@@ -285,9 +285,28 @@ async def change_password(
 
 
 @router.post("/logout")
-async def logout(_user: User = Depends(get_current_user)):
-    """服务端 noop，前端清 token 即可。"""
-    return {"ok": True}
+async def logout(
+    authorization: Optional[str] = Header(default=None),
+    _user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """服务端登出：将当前 token 的 jti 写入 revoked_tokens，使旧 token 立即失效。
+
+    纯前端删除 token 无法阻止已签发的 token 在 24h 内继续可用；
+    本端点提供真正的服务端吊销（幂等：重复登出不报错）。
+    """
+    token = _extract_bearer(authorization)
+    if token:
+        payload = decode_jwt(token, settings.jwt_secret)
+        jti = payload.get("jti") if payload else None
+        if jti:
+            existing = (await db.execute(
+                select(RevokedToken).where(RevokedToken.jti == jti)
+            )).scalar_one_or_none()
+            if not existing:
+                db.add(RevokedToken(jti=jti, revoked_at=datetime.now(timezone.utc)))
+                await db.commit()
+    return {"ok": True, "msg": "已退出登录"}
 
 
 @router.get("/me", response_model=MeResponse)

@@ -8,7 +8,7 @@
 - 兴趣特长：暑期活动记录
 
 用法：后端服务运行中，执行
-    python seeds/_seed_dabao_mock.py
+    python scripts/seed/_seed_dabao_mock.py
 数据通过 API 写入，与界面录入行为一致。
 """
 import json

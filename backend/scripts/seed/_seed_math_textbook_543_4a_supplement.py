@@ -4,7 +4,7 @@
 本脚本通过 API 建题 + 直连数据库建单元/知识点关联（与 _seed_math_textbook_543_4a.py 一致）。
 
 运行方式（在 backend 目录下）：
-    PYTHONPATH=. ./.venv/Scripts/python.exe seeds/_seed_math_textbook_543_4a_supplement.py
+    PYTHONPATH=. ./.venv/Scripts/python.exe scripts/seed/_seed_math_textbook_543_4a_supplement.py
 """
 import json
 import urllib.request

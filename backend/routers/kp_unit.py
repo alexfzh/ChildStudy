@@ -74,16 +74,19 @@ async def link_point_to_units(point_id: int, payload: List[KnowledgePointUnitLin
     )).scalars().all()
     for ex in existing:
         await db.delete(ex)
+    # 批量预取（修复 N+1）：一次校验全部 unit_id 存在性
+    unit_ids = [link.unit_id for link in payload]
+    valid_unit_ids = set((await db.execute(
+        select(TextbookUnit.id).where(TextbookUnit.id.in_(unit_ids))
+    )).scalars().all()) if unit_ids else set()
     for link in payload:
-        unit = await db.get(TextbookUnit, link.unit_id)
-        if not unit:
+        if link.unit_id not in valid_unit_ids:
             continue
-        kpu = KnowledgePointUnit(
+        db.add(KnowledgePointUnit(
             knowledge_point_id=point_id,
             unit_id=link.unit_id,
             relevance=link.relevance,
-        )
-        db.add(kpu)
+        ))
     await db.commit()
     return OkResponse(message=f"已为知识点 {point_id} 关联 {len(payload)} 个 Unit")
 
@@ -91,19 +94,30 @@ async def link_point_to_units(point_id: int, payload: List[KnowledgePointUnitLin
 @router.post("/bulk", response_model=OkResponse)
 async def bulk_link(payload: List[KnowledgePointUnitBulkLink], db: AsyncSession = Depends(get_db), _parent=Depends(require_parent)):
     """批量关联 KP ↔ Unit（覆盖模式：删旧 → 插新）"""
+    from sqlalchemy import delete as sa_delete
+
+    if not payload:
+        return OkResponse(message="已批量关联 0 条 KP-Unit")
+    # 批量预取（修复 N+1）：KP/Unit 存在性 + 旧关联，全部一次查出
+    kp_ids = [item.knowledge_point_id for item in payload]
+    valid_kp_ids = set((await db.execute(
+        select(KnowledgePoint.id).where(KnowledgePoint.id.in_(kp_ids))
+    )).scalars().all())
+    unit_ids = list({link.unit_id for item in payload for link in item.links})
+    valid_unit_ids = set((await db.execute(
+        select(TextbookUnit.id).where(TextbookUnit.id.in_(unit_ids))
+    )).scalars().all()) if unit_ids else set()
+    # 批量删旧（覆盖模式；仅限存在的 KP，与原逐条语义一致）
+    await db.execute(sa_delete(KnowledgePointUnit).where(
+        KnowledgePointUnit.knowledge_point_id.in_(list(valid_kp_ids))
+    ))
+
     total = 0
     for item in payload:
-        p = await db.get(KnowledgePoint, item.knowledge_point_id)
-        if not p:
+        if item.knowledge_point_id not in valid_kp_ids:
             continue
-        existing = (await db.execute(
-            select(KnowledgePointUnit).where(KnowledgePointUnit.knowledge_point_id == item.knowledge_point_id)
-        )).scalars().all()
-        for ex in existing:
-            await db.delete(ex)
         for link in item.links:
-            unit = await db.get(TextbookUnit, link.unit_id)
-            if not unit:
+            if link.unit_id not in valid_unit_ids:
                 continue
             db.add(KnowledgePointUnit(
                 knowledge_point_id=item.knowledge_point_id,

@@ -61,12 +61,16 @@ def _b64url_decode(s: str) -> bytes:
 
 
 def create_jwt(payload: dict[str, Any], secret: str, expires_seconds: int = 86400) -> str:
-    """签发 JWT (HS256)。默认 24h 过期。"""
+    """签发 JWT (HS256)。默认 24h 过期。
+
+    每次签发生成唯一 jti，用于服务端登出时的令牌吊销（RevokedToken 表）。
+    """
     header = {"alg": "HS256", "typ": "JWT"}
     now = int(time.time())
     body = dict(payload)
     body["iat"] = now
     body["exp"] = now + expires_seconds
+    body["jti"] = secrets.token_hex(16)
     h = _b64url_encode(json.dumps(header, separators=(",", ":")).encode())
     p = _b64url_encode(json.dumps(body, separators=(",", ":")).encode())
     sig = hmac.new(secret.encode("utf-8"), f"{h}.{p}".encode(), hashlib.sha256).digest()

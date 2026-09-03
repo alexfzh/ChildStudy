@@ -19,6 +19,7 @@ async def list_homeworks(
     child_id: Optional[int] = None,
     subject: Optional[str] = None,
     limit: int = Query(200, le=1000),
+    offset: int = 0,
     db: AsyncSession = Depends(get_db),
     accessible: set[int] = Depends(get_accessible_child_ids),
 ):
@@ -28,7 +29,7 @@ async def list_homeworks(
     stmt = stmt.where(child_id_filter(accessible, child_id, Homework.child_id))
     if subject:
         stmt = stmt.where(Homework.subject == subject)
-    stmt = stmt.limit(limit)
+    stmt = stmt.limit(limit).offset(offset)
     result = await db.execute(stmt)
     return result.scalars().all()
 

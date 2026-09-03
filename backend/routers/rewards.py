@@ -275,31 +275,21 @@ async def get_points(
 
 # ============ 考试奖励（编排层） ============
 
-@router.post("/exam-reward/{exam_id}", response_model=ExamRewardResponse)
-async def exam_reward(
-    exam_id: int,
-    db: AsyncSession = Depends(get_db),
-    accessible: set[int] = Depends(get_accessible_child_ids),
-):
-    """考试录入后调用：发放积分 + 检查成就 + 更新段位（幂等）
+async def grant_exam_reward(db: AsyncSession, exam_id: int) -> Optional[dict]:
+    """内部可复用：发放考试积分 + 成就 + 段位（幂等，与 /exam-reward 端点共用核心逻辑）。
 
-    Idempotency:
-      - 积分：同一 exam 只发一次。backfill 不会双倍发分。
-      - 成就：grant_achievement 内部检查 existing 防重。
-      - 段位：recalc_subject_rank 按当前考试列表+积分流水重算，多次调用结果一致。
+    - 积分：同一 exam 只发一次（points_already_granted 防 backfill 重复发分）。
+    - 成就：_grant_exam_achievements 内部检查 existing 防重。
+    - 段位：recalc_subject_rank 按当前考试列表 + 积分流水重算，多次调用结果一致。
+    返回摘要 dict；exam 不存在时返回 None（调用方据需处理）。
     """
     exam = await db.get(Exam, exam_id)
     if not exam:
-        raise HTTPException(404, "考试记录不存在")
-    assert_child_access(accessible, exam.child_id)
-
-    child = await db.get(Child, exam.child_id)
-    if not child:
-        raise HTTPException(404, "孩子档案不存在")
+        return None
 
     points = calc_exam_points(exam.score, exam.full_score)
 
-    # 积分幂等：同一 exam 只发一次积分（防 backfill 重复发分）
+    # 积分幂等：同一 exam 只发一次积分
     existing_log = (await db.execute(
         select(PointsLog).where(
             PointsLog.child_id == exam.child_id,
@@ -310,12 +300,11 @@ async def exam_reward(
     points_already_granted = existing_log is not None
 
     if not existing_log:
-        log = PointsLog(
+        db.add(PointsLog(
             child_id=exam.child_id, points=points,
             source="exam_reward", source_id=exam_id,
             description=f"{exam.exam_name} {exam.subject} +{points}分",
-        )
-        db.add(log)
+        ))
 
     # 段位重算（统一入口；内部先 flush，使上面新加的积分日志对统计可见）
     rank = await recalc_subject_rank(db, exam.child_id, exam.subject)
@@ -324,6 +313,39 @@ async def exam_reward(
     new_achievements = await _grant_exam_achievements(db, exam, rank)
 
     await db.commit()
+
+    return {
+        "points_earned": points,
+        "points_already_granted": points_already_granted,
+        "new_achievements": new_achievements,
+        "rank": rank,
+    }
+
+
+@router.post("/exam-reward/{exam_id}", response_model=ExamRewardResponse)
+async def exam_reward(
+    exam_id: int,
+    db: AsyncSession = Depends(get_db),
+    accessible: set[int] = Depends(get_accessible_child_ids),
+):
+    """考试录入后调用：发放积分 + 检查成就 + 更新段位（幂等）。
+
+    核心逻辑见 grant_exam_reward，本端点负责鉴权 + 响应构造。
+    """
+    exam = await db.get(Exam, exam_id)
+    if not exam:
+        raise HTTPException(404, "考试记录不存在")
+    assert_child_access(accessible, exam.child_id)
+
+    child = await db.get(Child, exam.child_id)
+    if not child:
+        raise HTTPException(404, "孩子档案不存在")
+
+    result = await grant_exam_reward(db, exam_id)
+    points = result["points_earned"]
+    points_already_granted = result["points_already_granted"]
+    new_achievements = result["new_achievements"]
+    rank = result["rank"]
 
     # 构建响应
     new_rank = None
@@ -427,17 +449,20 @@ async def _grant_exam_achievements(
         await _grant("rank_king", "👑 终极王者", "任意科目达到王者段位", "rank_tier", 95)
 
     # 最近一次各科成绩 → 全能选手 / 顶尖高手
-    latest_scores = {}
-    all_subjects = (await db.execute(
-        select(Exam.subject).where(Exam.child_id == exam.child_id).distinct()
-    )).scalars().all()
-    for subj in all_subjects:
-        latest = (await db.execute(
-            select(Exam).where(Exam.child_id == exam.child_id, Exam.subject == subj)
-            .order_by(Exam.exam_date.desc(), Exam.id.desc()).limit(1)
-        )).scalar_one_or_none()
-        if latest and latest.full_score:
-            latest_scores[subj] = latest.score / latest.full_score * 100
+    # 批量预取（修复 N+1）：一次取该孩子全部考试（按时间倒序），Python 内按科目取首条即最新
+    all_exams = list((await db.execute(
+        select(Exam)
+        .where(Exam.child_id == exam.child_id)
+        .order_by(Exam.exam_date.desc(), Exam.id.desc())
+    )).scalars().all())
+    latest_scores: dict[str, float] = {}
+    seen_subjects: set[str] = set()
+    for e in all_exams:
+        if e.subject in seen_subjects:
+            continue
+        seen_subjects.add(e.subject)
+        if e.full_score:
+            latest_scores[e.subject] = e.score / e.full_score * 100
     if latest_scores and all(v >= 80 for v in latest_scores.values()):
         await _grant("all_above_80", "🌟 全能选手", "最近一次考试全部科目≥80分", "all_above", 80)
     if latest_scores and all(v >= 90 for v in latest_scores.values()):

@@ -1,14 +1,22 @@
 """教材 Big Task / Project 作品管理"""
 from datetime import datetime, timezone
+from pathlib import Path
 from typing import List, Optional
 
 from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
+from fastapi.responses import FileResponse
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from config import settings
 from database import get_db
-from dependencies import assert_child_access, child_id_filter, get_accessible_child_ids
-from models import Child, ProjectWork, TextbookUnit
+from dependencies import (
+    assert_child_access,
+    child_id_filter,
+    get_accessible_child_ids,
+    get_current_user,
+)
+from models import Child, ProjectWork, TextbookUnit, User
 from schemas import OkResponse, ProjectWorkCreate, ProjectWorkOut, ProjectWorkUpdate
 
 router = APIRouter(prefix="/api/project-works", tags=["项目作品"])
@@ -131,3 +139,28 @@ async def delete_work(
     await db.delete(pw)
     await db.commit()
     return OkResponse(message="删除成功")
+
+
+@router.get("/{work_id}/image")
+async def get_work_image(
+    work_id: int,
+    db: AsyncSession = Depends(get_db),
+    _user: User = Depends(get_current_user),
+    accessible: set[int] = Depends(get_accessible_child_ids),
+):
+    """鉴权回取作品图片（更稳妥的替代方案，避免 /uploads 静态目录公开暴露）。
+
+    校验 child_id 归属后返回文件。前端既可用 <img src="/uploads/...">（静态挂载，家庭 LAN 可接受），
+    也可用本端点（带 Bearer token，适合跨设备 / 严格隐私场景）。
+    """
+    pw = await db.get(ProjectWork, work_id)
+    if not pw or not pw.image_path:
+        raise HTTPException(404, "作品或图片不存在")
+    assert_child_access(accessible, pw.child_id)
+    fname = pw.image_path.rsplit("/", 1)[-1]
+    base = Path(settings.upload_dir).resolve()
+    target = (base / "project_works" / fname).resolve()
+    # 防路径穿越：目标必须落在 upload_dir 内
+    if not str(target).startswith(str(base)) or not target.is_file():
+        raise HTTPException(404, "图片不存在")
+    return FileResponse(target)

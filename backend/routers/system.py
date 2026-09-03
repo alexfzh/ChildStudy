@@ -4,10 +4,24 @@ import os
 from datetime import datetime, timezone
 from pathlib import Path
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 from pydantic import BaseModel
+from sqlalchemy import func, select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from config import settings
+from database import get_db
+from dependencies import get_current_user
+from models import (
+    AIReport,
+    Child,
+    Exam,
+    Homework,
+    PointsLog,
+    ProjectWork,
+    User,
+    WrongQuestion,
+)
 
 router = APIRouter(prefix="/api/system", tags=["系统"])
 
@@ -31,7 +45,7 @@ class UpgradeLog(BaseModel):
 
 
 # 当前版本（手动 bump，对应前端 package.json version）
-CURRENT_VERSION = "1.7.3"
+CURRENT_VERSION = "1.8.0"
 BUILD_TIME = "2026-09-02"
 
 # 全量升级历史存在 data/upgrade_log.json（不提交 git，部署端自动积累）
@@ -102,6 +116,13 @@ _SEED_LOG = [
         "status": "success",
         "detail": "hotfix: 修复 GrowthRecord / SocialEmotional / Interest 三条 POST /:child_id 路由 422 bug — schemas.py 三个 Base schema 中 child_id 改为 Optional[int] = None (原 int 必填与 router 从路径注入冲突, 前端表单不传 child_id). 新增 test_growth_create.py 8 个测试覆盖三种 record + 兼容性 + 范围守卫. ruff + pytest 168 passed (v1.7.3).",
     },
+    {
+        "timestamp": "2026-09-03T13:00:00",
+        "from_version": "1.7.3",
+        "to_version": "1.8.0",
+        "status": "success",
+        "detail": "安全审计闭环 + 性能优化: JWT 占位密钥 fail-fast 拒绝启动 + 服务端令牌吊销(RevokedToken/jti, logout 真吊销) + AIReports XSS 链接转义 + /uploads 静态挂载与鉴权图片端点 + 考试创建自动发积分(grant_exam_reward 幂等) + 版本接口去 DB 绝对路径 + IP 限流中间件 + /api/system/metrics + 列表 offset 分页 + SQLite 自动备份脚本 + Caddy HTTPS 部署模板 + 跨平台 CI(ruff/pytest/schema-router/前端 build+路由审计) + element-plus 按需引入(938KB 单包消除) + 8 组 N+1 批量预取 + router CRUD 测试补齐(children/timeline/project_works/question_banks/dashboard) + seeds 迁移 scripts/seed + Alembic 迁移骨架. ruff 全过, pytest 229 passed (v1.8.0).",
+    },
 ]
 
 
@@ -157,7 +178,7 @@ async def get_version():
         python_version=f"{os.sys.version_info.major}.{os.sys.version_info.minor}.{os.sys.version_info.micro}",
         backend_host=settings.app_host,
         backend_port=settings.app_port,
-        database=settings.database_url.split("///")[-1] if "///" in settings.database_url else settings.database_url,
+        database="SQLite (本地文件)",  # 不回显绝对路径，避免信息泄漏
         debug_mode=settings.app_debug,
     )
 
@@ -178,4 +199,25 @@ async def trigger_upgrade():
         "ok": True,
         "message": f"当前已是最新版本 {CURRENT_VERSION}，无需升级",
         "current_version": CURRENT_VERSION,
+    }
+
+
+@router.get("/metrics")
+async def get_metrics(
+    db: AsyncSession = Depends(get_db),
+    _user: User = Depends(get_current_user),
+):
+    """基础可观测性指标（需登录）。返回各核心表行数。"""
+    async def _count(model):
+        return (await db.execute(select(func.count()).select_from(model))).scalar_one()
+
+    return {
+        "users": await _count(User),
+        "children": await _count(Child),
+        "exams": await _count(Exam),
+        "homeworks": await _count(Homework),
+        "wrong_questions": await _count(WrongQuestion),
+        "project_works": await _count(ProjectWork),
+        "points_log": await _count(PointsLog),
+        "ai_reports": await _count(AIReport),
     }

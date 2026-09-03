@@ -1,5 +1,8 @@
 """FastAPI 主入口"""
+import json
 import logging
+import time
+from collections import defaultdict, deque
 from contextlib import asynccontextmanager
 from pathlib import Path
 
@@ -71,6 +74,56 @@ app.add_middleware(
 )
 
 
+# ---- 简单 IP 限流中间件（防滥用；部署时由 .env 的 RATE_LIMIT_PER_MINUTE 启用）----
+class RateLimitMiddleware:
+    """基于来源 IP 的滑动窗口限流（单进程内有效，多 worker 需共享存储）。
+
+    默认关闭（RATE_LIMIT_PER_MINUTE=0）。仅限制 /api/*，放开登录与健康检查。
+    """
+
+    def __init__(self, app, per_minute: int = 0):
+        self.app = app
+        self.per_minute = per_minute
+        self._hits: dict[str, deque] = defaultdict(deque)
+
+    async def __call__(self, scope, receive, send):
+        if self.per_minute > 0 and scope.get("type") == "http":
+            path = scope.get("path", "")
+            if path.startswith("/api/") and path not in ("/api/auth/login", "/api/health"):
+                ip = self._client_ip(scope)
+                now = time.time()
+                dq = self._hits[ip]
+                while dq and dq[0] < now - 60:
+                    dq.popleft()
+                if len(dq) >= self.per_minute:
+                    await self._send_429(send)
+                    return
+                dq.append(now)
+        await self.app(scope, receive, send)
+
+    @staticmethod
+    def _client_ip(scope) -> str:
+        for k, v in scope.get("headers", []):
+            if k == b"x-forwarded-for":
+                return v.decode().split(",")[0].strip()
+        client = scope.get("client")
+        return client[0] if client else "unknown"
+
+    @staticmethod
+    async def _send_429(send):
+        body = json.dumps({"detail": "请求过于频繁，请稍后再试"}).encode()
+        await send({
+            "type": "http.response.start",
+            "status": 429,
+            "headers": [(b"content-type", b"application/json")],
+        })
+        await send({"type": "http.response.body", "body": body})
+
+
+if settings.rate_limit_per_minute > 0:
+    app.add_middleware(RateLimitMiddleware, per_minute=settings.rate_limit_per_minute)
+
+
 # 健康检查（公开）
 @app.get("/api/health")
 async def health():
@@ -111,6 +164,13 @@ _PROTECTED = [
 for r in _PROTECTED:
     app.include_router(r.router, dependencies=[Depends(get_current_user)])
 
+
+# 用户上传文件（作品图片等）：独立静态目录，供前端 <img> 直接回取
+# 注意：文件名由服务端生成（work_{id}_{ts}.ext），不可枚举；家庭局域网场景下可接受公开访问。
+# 若需严格鉴权，应改为受保护端点 + 前端 fetch→blob 方式回取。
+UPLOAD_DIR = Path("./uploads").resolve()
+if UPLOAD_DIR.exists():
+    app.mount("/uploads", StaticFiles(directory=UPLOAD_DIR), name="uploads")
 
 # 静态资源（前端打包产物）
 STATIC_DIR = Path(__file__).resolve().parent.parent / "frontend" / "dist"

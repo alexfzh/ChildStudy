@@ -75,10 +75,13 @@ async def link_kps_to_question(question_id: int, payload: List[QuestionKPLink], 
     for ex in existing:
         await db.delete(ex)
 
-    # 插入新关联
+    # 插入新关联 —— 批量预取（修复 N+1）：一次校验全部 kp_id 存在性
+    kp_ids = [link.knowledge_point_id for link in payload]
+    valid_kp_ids = set((await db.execute(
+        select(KnowledgePoint.id).where(KnowledgePoint.id.in_(kp_ids))
+    )).scalars().all()) if kp_ids else set()
     for link in payload:
-        kp = await db.get(KnowledgePoint, link.knowledge_point_id)
-        if not kp:
+        if link.knowledge_point_id not in valid_kp_ids:
             continue
         db.add(QuestionKnowledgePoint(
             question_id=question_id,
@@ -92,21 +95,30 @@ async def link_kps_to_question(question_id: int, payload: List[QuestionKPLink], 
 @router.post("/bulk", response_model=OkResponse)
 async def bulk_link(payload: List[QuestionKPBulkLink], db: AsyncSession = Depends(get_db), _parent=Depends(require_parent)):
     """批量关联 Question ↔ KP（覆盖模式）"""
+    from sqlalchemy import delete as sa_delete
+
+    if not payload:
+        return OkResponse(message="已批量关联 0 条 Question-KP")
+    # 批量预取（修复 N+1）：Question/KP 存在性 + 批量删旧，全部一次完成
+    question_ids = [item.question_id for item in payload]
+    valid_qids = set((await db.execute(
+        select(Question.id).where(Question.id.in_(question_ids))
+    )).scalars().all())
+    kp_ids = list({link.knowledge_point_id for item in payload for link in item.links})
+    valid_kp_ids = set((await db.execute(
+        select(KnowledgePoint.id).where(KnowledgePoint.id.in_(kp_ids))
+    )).scalars().all()) if kp_ids else set()
+    # 批量删旧（覆盖模式；仅限存在的 Question，与原逐条语义一致）
+    await db.execute(sa_delete(QuestionKnowledgePoint).where(
+        QuestionKnowledgePoint.question_id.in_(list(valid_qids))
+    ))
+
     total = 0
     for item in payload:
-        q = await db.get(Question, item.question_id)
-        if not q:
+        if item.question_id not in valid_qids:
             continue
-        # 删旧
-        existing = (await db.execute(
-            select(QuestionKnowledgePoint).where(QuestionKnowledgePoint.question_id == item.question_id)
-        )).scalars().all()
-        for ex in existing:
-            await db.delete(ex)
-        # 插新
         for link in item.links:
-            kp = await db.get(KnowledgePoint, link.knowledge_point_id)
-            if not kp:
+            if link.knowledge_point_id not in valid_kp_ids:
                 continue
             db.add(QuestionKnowledgePoint(
                 question_id=item.question_id,

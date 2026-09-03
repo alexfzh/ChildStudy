@@ -6,7 +6,7 @@
 - 3 道通过复习接口补真实复习历史（其中 1 道复习两次后标记已掌握）
 
 用法：后端服务运行中，执行
-    python seeds/_seed_dabao_wrong_questions.py
+    python scripts/seed/_seed_dabao_wrong_questions.py
 """
 import json
 import urllib.request

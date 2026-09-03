@@ -104,6 +104,15 @@ async def update_kp_progress_on_exercise(db: AsyncSession, child_id: int, exerci
     if not qkp_rows:
         return {"updated_kps": []}
 
+    # 批量预取:本场题目 → 所属 Unit（修复 N+1：原循环内逐题查询）
+    qu_rows = (await db.execute(
+        select(QuestionUnit.question_id, QuestionUnit.unit_id)
+        .where(QuestionUnit.question_id.in_(question_ids))
+    )).all()
+    unit_by_qid: dict[int, int] = {}
+    for qid, uid in qu_rows:
+        unit_by_qid.setdefault(qid, uid)  # 同题多 Unit 取第一个，与原 limit(1) 语义一致
+
     # 按 KP 聚合：统计每 KP 的本场 attempts/correct
     kp_stats: dict[int, dict] = {}  # kp_id -> {attempts, correct, unit_id}
     for qkp, q in qkp_rows:
@@ -116,12 +125,9 @@ async def update_kp_progress_on_exercise(db: AsyncSession, child_id: int, exerci
             kp_stats[kp_id]["correct"] += 1
         # 取第一个非 None unit_id（多 Unit 题取第一个）
         if kp_stats[kp_id]["unit_id"] is None:
-            # 反查该题关联的 Unit（用于 context）
-            qu_row = (await db.execute(
-                select(QuestionUnit.unit_id).where(QuestionUnit.question_id == q.id).limit(1)
-            )).first()
-            if qu_row:
-                kp_stats[kp_id]["unit_id"] = qu_row[0]
+            uid = unit_by_qid.get(q.id)
+            if uid:
+                kp_stats[kp_id]["unit_id"] = uid
 
     for kp_id, stats in kp_stats.items():
         kp = await get_or_create_kp_progress(db, child_id, kp_id, stats["unit_id"])
@@ -245,25 +251,34 @@ async def get_kp_progress_for_version(
         return ChildKPProgressSummary(child_id=child_id, version_id=version_id,
                                        total_kps=0, overall_mastery_pct=0.0, kp_summary_by_unit=[])
 
-    # 各 Unit 汇总（复用上面 endpoint 的逻辑，并行拉）
+    # 各 Unit 汇总 —— 批量预取（修复 N+1：原每 Unit 各发 2 条查询，教材 10-30 个 Unit 时 20-60 条）
+    from models import KnowledgePointUnit
+    unit_ids_all = [u.id for u in units]
+
+    # 1) 一次取全部 Unit 的 KP 关联 → unit_id -> [kp_id]
+    kpu_rows = (await db.execute(
+        select(KnowledgePointUnit.unit_id, KnowledgePointUnit.knowledge_point_id)
+        .where(KnowledgePointUnit.unit_id.in_(unit_ids_all))
+    )).all()
+    kp_ids_by_unit: dict[int, list[int]] = {}
+    for uid, kpid in kpu_rows:
+        kp_ids_by_unit.setdefault(uid, []).append(kpid)
+
+    # 2) 一次取该孩子在这些 Unit 下的全部 KP 进度 → unit_id -> {kp_id: progress}
+    progress_all = (await db.execute(
+        select(KPStudyProgress).where(
+            KPStudyProgress.child_id == child_id,
+            KPStudyProgress.unit_id.in_(unit_ids_all),
+        )
+    )).scalars().unique().all()
+    progress_by_unit: dict[int, dict[int, KPStudyProgress]] = {}
+    for p in progress_all:
+        progress_by_unit.setdefault(p.unit_id, {})[p.knowledge_point_id] = p
+
     summaries = []
     for u in units:
-        # 调 get_kp_progress_for_unit 逻辑（内联避免嵌套调用）
-        from models import KnowledgePointUnit
-        kp_ids = (await db.execute(
-            select(KnowledgePointUnit.knowledge_point_id).where(KnowledgePointUnit.unit_id == u.id)
-        )).scalars().all()
-
-        progress_rows = (await db.execute(
-            select(KPStudyProgress).where(
-                and_(
-                    KPStudyProgress.child_id == child_id,
-                    KPStudyProgress.knowledge_point_id.in_(kp_ids) if kp_ids else False,
-                    KPStudyProgress.unit_id == u.id,
-                )
-            )
-        )).scalars().unique().all() if kp_ids else []
-        progress_map = {p.knowledge_point_id: p for p in progress_rows}
+        kp_ids = kp_ids_by_unit.get(u.id, [])
+        progress_map = progress_by_unit.get(u.id, {})
 
         details = []
         counts = {"mastered": 0, "strong": 0, "learning": 0, "new": 0}

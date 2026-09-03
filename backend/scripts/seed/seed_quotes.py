@@ -1,8 +1,8 @@
 """诗词 / 名言种子数据（孩子看板欢迎栏随机展示）
 
 用法（在 backend 目录下）：
-    .venv/Scripts/python.exe seeds/seed_quotes.py          # 首次导入（表空时）
-    .venv/Scripts/python.exe seeds/seed_quotes.py --force  # 清空后重新导入
+    .venv/Scripts/python.exe scripts/seed/seed_quotes.py          # 首次导入（表空时）
+    .venv/Scripts/python.exe scripts/seed/seed_quotes.py --force  # 清空后重新导入
 
 内容来源：语文教育网站收录的小学/初中必背古诗词名句、励志劝学诗文，
 以及中外名人名言（带出处）。所有条目人工核对过作者与出处，内容唯一无重复。
@@ -13,10 +13,10 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from sqlalchemy import func, select  # noqa: E402
+from sqlalchemy import func, select
 
-from database import AsyncSessionLocal, init_db  # noqa: E402
-from models import Quote  # noqa: E402
+from database import AsyncSessionLocal, init_db
+from models import Quote
 
 # (content, author, source, category)
 QUOTES = [

@@ -111,10 +111,18 @@ async def compare_children(
     )
     children = list(children_q.scalars().all())
 
+    # 批量预取（修复 N+1）：一次取全部孩子的考试，按 child_id 分组
+    exams_by_child: dict[int, list] = {}
+    if children:
+        exams_q = await db.execute(
+            select(Exam).where(Exam.child_id.in_([c.id for c in children]))
+        )
+        for e in exams_q.scalars().all():
+            exams_by_child.setdefault(e.child_id, []).append(e)
+
     result = []
     for c in children:
-        exams_q = await db.execute(select(Exam).where(Exam.child_id == c.id))
-        exams = list(exams_q.scalars().all())
+        exams = exams_by_child.get(c.id, [])
         stats = build_subject_stats(exams)
         if stats:
             avg = sum(s["avg_score"] for s in stats) / len(stats)

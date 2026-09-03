@@ -1,4 +1,5 @@
 """考试记录路由"""
+import logging
 from datetime import date
 from typing import List, Optional
 
@@ -9,7 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from database import get_db
 from dependencies import assert_child_access, child_id_filter, get_accessible_child_ids
 from models import Child, ChildAchievement, Exam, ExamQuestion, PointsLog, WrongQuestion
-from routers.rewards import recalc_subject_rank
+from routers.rewards import grant_exam_reward, recalc_subject_rank
 from schemas import (
     ExamAnalysis,
     ExamCreate,
@@ -30,6 +31,8 @@ from utils.exam_analyzer import (
 )
 from utils.grade import get_grade_at_date
 
+logger = logging.getLogger("childstudy")
+
 router = APIRouter(prefix="/api/exams", tags=["考试记录"])
 
 
@@ -41,6 +44,7 @@ async def list_exams(
     start_date: Optional[date] = None,
     end_date: Optional[date] = None,
     limit: int = Query(200, le=1000),
+    offset: int = 0,
     db: AsyncSession = Depends(get_db),
     accessible: set[int] = Depends(get_accessible_child_ids),
 ):
@@ -57,7 +61,7 @@ async def list_exams(
         stmt = stmt.where(Exam.exam_date >= start_date)
     if end_date:
         stmt = stmt.where(Exam.exam_date <= end_date)
-    stmt = stmt.limit(limit)
+    stmt = stmt.limit(limit).offset(offset)
     result = await db.execute(stmt)
     return result.scalars().all()
 
@@ -81,6 +85,11 @@ async def create_exam(
     db.add(exam)
     await db.commit()
     await db.refresh(exam)
+    # 自动发放考试积分 + 成就 + 段位（幂等；与 /exam-reward 共用核心逻辑，避免家长漏领）
+    try:
+        await grant_exam_reward(db, exam.id)
+    except Exception as exc:  # 发分失败绝不影响考试记录本身
+        logger.warning("考试 %s 创建后自动发积分失败（可稍后手动 /exam-reward 补发）：%s", exam.id, exc)
     return exam
 
 

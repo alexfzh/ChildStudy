@@ -745,3 +745,15 @@ class LoginLock(Base):
     fail_count: Mapped[int] = mapped_column(Integer, default=0)  # 连续失败次数
     first_fail_at: Mapped[Optional[float]] = mapped_column(Float, nullable=True)  # 窗口内首次失败时间戳
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now(timezone.utc), onupdate=datetime.now(timezone.utc))
+
+
+class RevokedToken(Base):
+    """已吊销的 JWT（服务端登出 / 改密后使旧 token 失效）
+
+    仅存 jti + 吊销时间，体积可忽略；过期 token 由 JWT exp 自然淘汰，无需定时清理。
+    """
+    __tablename__ = "revoked_tokens"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    jti: Mapped[str] = mapped_column(String(64), unique=True, index=True)  # JWT 唯一标识
+    revoked_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now(timezone.utc))
