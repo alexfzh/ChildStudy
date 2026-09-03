@@ -159,6 +159,17 @@ async def import_exams(
     content = content.decode("utf-8-sig")
     reader = csv.DictReader(io.StringIO(content))
 
+    # 行数预检：先扫一遍行数，超限直接拒绝，避免边读边 ORM 写入半途中断
+    total_rows = sum(1 for _ in reader)
+    max_rows = settings.max_import_rows
+    if total_rows > max_rows:
+        raise HTTPException(
+            413,
+            f"CSV 行数 {total_rows} 超过限制 {max_rows} 行（请拆分文件后重试；调整上限见 backend/.env 的 max_import_rows）",
+        )
+    # 重新构造 reader（上面的迭代已经消耗了）
+    reader = csv.DictReader(io.StringIO(content))
+
     required_headers = {"subject", "exam_name", "score", "exam_date"}
     if not required_headers.issubset(set(reader.fieldnames or [])):
         raise HTTPException(400, f"CSV 缺少必要列：{required_headers - set(reader.fieldnames or [])}")
@@ -244,6 +255,16 @@ async def import_homeworks(
     if len(content) > max_bytes:
         raise HTTPException(413, f"文件超过 {settings.max_upload_size_mb}MB 限制（实际 {len(content)/1024/1024:.1f}MB）")
     content = content.decode("utf-8-sig")
+    reader = csv.DictReader(io.StringIO(content))
+
+    # 行数预检
+    total_rows = sum(1 for _ in reader)
+    max_rows = settings.max_import_rows
+    if total_rows > max_rows:
+        raise HTTPException(
+            413,
+            f"CSV 行数 {total_rows} 超过限制 {max_rows} 行（请拆分文件后重试）",
+        )
     reader = csv.DictReader(io.StringIO(content))
 
     required_headers = {"subject", "title", "homework_date"}
