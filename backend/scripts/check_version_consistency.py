@@ -82,12 +82,15 @@ def main() -> int:
         else:
             ok = False
 
-    if len(versions) == 1:
+    if ok and len(versions) == 1:
         v = versions.pop()
         print(f'\n✅ 全部一致：{v}')
         return 0
 
-    print(f'\n❌ 不一致：发现 {len(versions)} 个不同版本 {sorted(versions)}')
+    if len(versions) > 1:
+        print(f'\n❌ 不一致：发现 {len(versions)} 个不同版本 {sorted(versions)}')
+    else:
+        print('\n❌ 存在解析失败/缺失的版本号，无法确认一致')
     return 1
 
 
