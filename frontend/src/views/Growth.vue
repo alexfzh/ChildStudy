@@ -567,8 +567,8 @@ function tagClass(color) {
             <tr class="border-b border-slate-100">
               <th class="text-left py-2 px-3 text-slate-500 font-medium">日期</th>
               <th class="text-left py-2 px-3 text-slate-500 font-medium">年龄</th>
-              <th class="text-right py-2 px-3 text-slate-500 font-medium" colspan="3">身高 (cm)</th>
-              <th class="text-right py-2 px-3 text-slate-500 font-medium" colspan="3">体重 (kg)</th>
+              <th class="text-right py-2 px-3 text-slate-500 font-medium" colspan="4">身高 (cm)</th>
+              <th class="text-right py-2 px-3 text-slate-500 font-medium" colspan="4">体重 (kg)</th>
               <th class="text-right py-2 px-3 text-slate-500 font-medium">BMI</th>
               <th class="text-left py-2 px-3 text-slate-500 font-medium">等级</th>
               <th class="text-left py-2 px-3 text-slate-500 font-medium">视力</th>
@@ -578,9 +578,11 @@ function tagClass(color) {
             <tr class="border-b border-slate-50">
               <th class="py-1 px-3"></th>
               <th class="py-1 px-3"></th>
+              <th class="text-right py-1 px-3 text-xs text-slate-600 font-medium">孩子</th>
               <th class="text-right py-1 px-3 text-xs text-slate-400">P3</th>
               <th class="text-right py-1 px-3 text-xs text-slate-400 font-medium text-slate-600">P50</th>
               <th class="text-right py-1 px-3 text-xs text-slate-400">P97</th>
+              <th class="text-right py-1 px-3 text-xs text-slate-600 font-medium">孩子</th>
               <th class="text-right py-1 px-3 text-xs text-slate-400">P3</th>
               <th class="text-right py-1 px-3 text-xs text-slate-400 font-medium text-slate-600">P50</th>
               <th class="text-right py-1 px-3 text-xs text-slate-400">P97</th>
@@ -595,13 +597,14 @@ function tagClass(color) {
             <tr v-for="r in enrichedRecords" :key="r.id" class="border-b border-slate-50 hover:bg-slate-50">
               <td class="py-2 px-3 text-slate-700">{{ r.record_date }}</td>
               <td class="py-2 px-3 text-slate-700">{{ r.ageLabel }}</td>
-              <td class="py-2 px-3 text-right font-mono text-slate-600" :title="stdTooltip(r.heightStd, 'cm')">{{ r.height_cm ?? '-' }}</td>
+              <td class="py-2 px-3 text-right font-mono font-semibold text-slate-800" :title="stdTooltip(r.heightStd, 'cm')">{{ r.height_cm ?? '-' }}</td>
               <td class="py-2 px-3 text-right font-mono text-slate-400">{{ r.heightStd?.p3 ?? '-' }}</td>
               <td class="py-2 px-3 text-right font-mono font-medium text-slate-700">{{ r.heightStd?.p50 ?? '-' }}</td>
               <td class="py-2 px-3 text-right font-mono text-slate-400">{{ r.heightStd?.p97 ?? '-' }}</td>
-              <td class="py-2 px-3 text-right font-mono text-slate-600" :title="stdTooltip(r.weightStd, 'kg')">{{ r.weight_kg ?? '-' }}</td>
+              <td class="py-2 px-3 text-right font-mono font-semibold text-slate-800" :title="stdTooltip(r.weightStd, 'kg')">{{ r.weight_kg ?? '-' }}</td>
               <td class="py-2 px-3 text-right font-mono text-slate-400">{{ r.weightStd?.p3 ?? '-' }}</td>
               <td class="py-2 px-3 text-right font-mono font-medium text-slate-700">{{ r.weightStd?.p50 ?? '-' }}</td>
+              <td class="py-2 px-3 text-right font-mono text-slate-400">{{ r.weightStd?.p97 ?? '-' }}</td>
               <td class="py-2 px-3 text-right font-mono text-slate-600">{{ r.bmi ?? '-' }}</td>
               <td class="py-2 px-3">
                 <span class="text-xs px-2 py-0.5 rounded-full" :class="tagClass(r.heightCategory?.color)">
