@@ -59,7 +59,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title="学业成长系统",
     description="为家长提供的孩子学习数据记录、AI 学情分析与可视化看板",
-    version="1.7.3",
+    version="1.8.1",
     lifespan=lifespan,
 )
 

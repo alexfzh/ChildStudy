@@ -45,8 +45,8 @@ class UpgradeLog(BaseModel):
 
 
 # 当前版本（手动 bump，对应前端 package.json version）
-CURRENT_VERSION = "1.8.0"
-BUILD_TIME = "2026-09-02"
+CURRENT_VERSION = "1.8.1"
+BUILD_TIME = "2026-09-03"
 
 # 全量升级历史存在 data/upgrade_log.json（不提交 git，部署端自动积累）
 _LOG_FILE = Path(__file__).resolve().parent.parent / "data" / "upgrade_log.json"
@@ -122,6 +122,13 @@ _SEED_LOG = [
         "to_version": "1.8.0",
         "status": "success",
         "detail": "安全审计闭环 + 性能优化: JWT 占位密钥 fail-fast 拒绝启动 + 服务端令牌吊销(RevokedToken/jti, logout 真吊销) + AIReports XSS 链接转义 + /uploads 静态挂载与鉴权图片端点 + 考试创建自动发积分(grant_exam_reward 幂等) + 版本接口去 DB 绝对路径 + IP 限流中间件 + /api/system/metrics + 列表 offset 分页 + SQLite 自动备份脚本 + Caddy HTTPS 部署模板 + 跨平台 CI(ruff/pytest/schema-router/前端 build+路由审计) + element-plus 按需引入(938KB 单包消除) + 8 组 N+1 批量预取 + router CRUD 测试补齐(children/timeline/project_works/question_banks/dashboard) + seeds 迁移 scripts/seed + Alembic 迁移骨架. ruff 全过, pytest 229 passed (v1.8.0).",
+    },
+    {
+        "timestamp": "2026-09-03T13:00:00",
+        "from_version": "1.8.0",
+        "to_version": "1.8.1",
+        "status": "success",
+        "detail": "新增生长发育模块 v2: 身高/体重/BMI 曲线图(echarts/core 模块化, value 月龄轴, P3/P50/P97 红黄绿虚线参考带, 月↔岁换算修复) + 中国儿童生长标准库(WS/T 423-2022 身高体重 0-83月5档 & 7-18岁3档, WS/T 586-2018 BMI 0-83月 + 6-18岁超重/肥胖界值) + Child.gender 字段 + 详细对比总表(修表头错位补'孩子'/体重P97列, 分组表头) + BMI 自动计算与儿童身体状态卡(thin/normal/overweight/obese 评估+建议) + /api/growth/standards 公开接口 + 页面对比照表与 4 项数据卡 + 悬停行高亮 + 页面美化 + deploy.ps1/package.ps1 Windows 一键部署脚本 + 整岁/月龄标准对照查询. ruff 全过 (v1.8.1).",
     },
 ]
 
