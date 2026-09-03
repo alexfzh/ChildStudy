@@ -129,6 +129,29 @@ if settings.rate_limit_per_minute > 0:
 async def health():
     return {"status": "ok", "app": "学业成长系统"}
 
+# 生长发育标准数据（公开，不涉及隐私）
+@app.get("/api/growth/standards")
+async def public_growth_standards():
+    from utils.growth_standards import (
+        BMI_0_83, BMI_CUTOFFS_6_18, HEIGHT_0_83, HEIGHT_7_18, WEIGHT_0_83, WEIGHT_7_18,
+    )
+    from utils.growth_assessor import get_standard_description
+    return {
+        "schema_version": 1,
+        "sources": [
+            "WS/T 423-2022 (0-7 岁)",
+            "WS/T 586-2018 (6-18 岁 BMI 切点)",
+            "WS/T 611-2018 (7-18 岁身高)",
+        ],
+        "height_0_83_months": HEIGHT_0_83,
+        "weight_0_83_months": WEIGHT_0_83,
+        "bmi_0_83_months": BMI_0_83,
+        "bmi_cutoffs_6_18": BMI_CUTOFFS_6_18,
+        "height_7_18_years": HEIGHT_7_18,
+        "weight_7_18_years": WEIGHT_7_18,
+        "description": get_standard_description(),
+    }
+
 
 # 公开路由（无需认证）：auth、config、system、knowledge-points 只读参考
 app.include_router(auth.router)
