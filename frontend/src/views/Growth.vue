@@ -1,9 +1,16 @@
 <script setup>
-import { ref, computed, onMounted, watch } from "vue";
+import { ref, computed, onMounted, watch, nextTick } from "vue";
 import { ElMessage, ElMessageBox } from "element-plus";
 import { useChildStore } from "@/stores/child";
 import { growthAPI } from "@/api";
 import * as growthUtil from "@/utils/growth";
+// ECharts 模块化导入（与 BaseChart.vue 一致，不依赖 window.echarts）
+import * as echarts from "echarts/core";
+import { CanvasRenderer } from "echarts/renderers";
+import { LineChart } from "echarts/charts";
+import { GridComponent, TooltipComponent, LegendComponent, TitleComponent } from "echarts/components";
+
+echarts.use([CanvasRenderer, LineChart, GridComponent, TooltipComponent, LegendComponent, TitleComponent]);
 
 const childStore = useChildStore();
 const childId = computed(() => childStore.current?.id);
@@ -331,13 +338,19 @@ function renderCharts() {
   const hSeries = points.map((p) => [p.months, p.height]);
   const wSeries = points.map((p) => [p.months, p.weight]);
 
-  if (chartRefHeight.value && window.echarts) {
-    const hChart = window.echarts.init(chartRefHeight.value);
-    hChart.setOption(buildChartOption(hSeries, groupBands(heightBands, ["P97", "P50", "P3"]), "身高曲线", "cm"), true);
+  if (chartRefHeight.value) {
+    const hChart = echarts.init(chartRefHeight.value);
+    hChart.setOption(
+      buildChartOption(hSeries, groupBands(heightBands, ["P97", "P50", "P3"]), "身高曲线", "cm"),
+      true
+    );
   }
-  if (chartRefWeight.value && window.echarts) {
-    const wChart = window.echarts.init(chartRefWeight.value);
-    wChart.setOption(buildChartOption(wSeries, groupBands(weightBands, ["P97", "P50", "P3"]), "体重曲线", "kg"), true);
+  if (chartRefWeight.value) {
+    const wChart = echarts.init(chartRefWeight.value);
+    wChart.setOption(
+      buildChartOption(wSeries, groupBands(weightBands, ["P97", "P50", "P3"]), "体重曲线", "kg"),
+      true
+    );
   }
 }
 
@@ -353,7 +366,8 @@ async function fetchData() {
     records.value = listRes;
     standards.value = stdRes;
     if (stdRes) growthUtil.setStandards(stdRes);
-    setTimeout(renderCharts, 100);
+    await nextTick();
+    renderCharts();
   } catch (e) {
     ElMessage.error("加载生长发育数据失败");
   } finally {
