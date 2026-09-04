@@ -1,19 +1,19 @@
 <script setup>
-import { ref, computed, onMounted } from "vue";
-import { ElMessage, ElMessageBox } from "element-plus";
-import { useChildStore } from "@/stores/child";
-import { socialEmotionalAPI } from "@/api";
+import { ref, computed, onMounted } from "vue"
+import { ElMessage, ElMessageBox } from "element-plus"
+import { useChildStore } from "@/stores/child"
+import { socialEmotionalAPI } from "@/api"
 
-const childStore = useChildStore();
-const childId = computed(() => childStore.current?.id);
+const childStore = useChildStore()
+const childId = computed(() => childStore.current?.id)
 
-const loading = ref(false);
-const records = ref([]);
+const loading = ref(false)
+const records = ref([])
 
-const dialogVisible = ref(false);
-const editing = ref(null);
+const dialogVisible = ref(false)
+const editing = ref(null)
 
-const emotionTagOptions = ["happy", "calm", "anxious", "angry", "sad", "excited", "nervous", "proud"];
+const emotionTagOptions = ["happy", "calm", "anxious", "angry", "sad", "excited", "nervous", "proud"]
 
 const blankForm = () => ({
   record_date: new Date().toISOString().slice(0, 10),
@@ -22,30 +22,30 @@ const blankForm = () => ({
   social_activity: "",
   confidence_level: "",
   note: "",
-});
+})
 
-const form = ref(blankForm());
+const form = ref(blankForm())
 
 const fetchList = async () => {
-  if (!childId.value) return;
-  loading.value = true;
+  if (!childId.value) return
+  loading.value = true
   try {
-    records.value = await socialEmotionalAPI.list(childId.value);
+    records.value = await socialEmotionalAPI.list(childId.value)
   } finally {
-    loading.value = false;
+    loading.value = false
   }
-};
+}
 
-onMounted(fetchList);
+onMounted(fetchList)
 
 const openCreate = () => {
-  editing.value = null;
-  form.value = blankForm();
-  dialogVisible.value = true;
-};
+  editing.value = null
+  form.value = blankForm()
+  dialogVisible.value = true
+}
 
 const openEdit = (r) => {
-  editing.value = r;
+  editing.value = r
   form.value = {
     record_date: r.record_date,
     mood_score: r.mood_score ?? "",
@@ -53,44 +53,45 @@ const openEdit = (r) => {
     social_activity: r.social_activity ?? "",
     confidence_level: r.confidence_level ?? "",
     note: r.note ?? "",
-  };
-  dialogVisible.value = true;
-};
+  }
+  dialogVisible.value = true
+}
 
 const submit = async () => {
   const data = {
     ...form.value,
     mood_score: form.value.mood_score ? Number(form.value.mood_score) : null,
     confidence_level: form.value.confidence_level ? Number(form.value.confidence_level) : null,
-  };
+  }
   try {
     if (editing.value) {
-      await socialEmotionalAPI.update(editing.value.id, data);
-      ElMessage.success("已更新");
+      await socialEmotionalAPI.update(editing.value.id, data)
+      ElMessage.success("已更新")
     } else {
-      await socialEmotionalAPI.create(childId.value, data);
-      ElMessage.success("已添加");
+      await socialEmotionalAPI.create(childId.value, data)
+      ElMessage.success("已添加")
     }
-    dialogVisible.value = false;
-    await fetchList();
-  } catch (e) { /* axios 已提示 */ }
-};
+    dialogVisible.value = false
+    await fetchList()
+  } catch (e) {
+    /* axios 已提示 */
+  }
+}
 
 const remove = async (r) => {
-  await ElMessageBox.confirm(`确认删除 ${r.record_date} 的社交情感记录吗？`, "删除", { type: "warning" });
-  await socialEmotionalAPI.remove(r.id);
-  ElMessage.success("已删除");
-  await fetchList();
-};
+  await ElMessageBox.confirm(`确认删除 ${r.record_date} 的社交情感记录吗？`, "删除", { type: "warning" })
+  await socialEmotionalAPI.remove(r.id)
+  ElMessage.success("已删除")
+  await fetchList()
+}
 
 const moodEmoji = (s) => {
-  const map = { 1: "😢", 2: "😟", 3: "😐", 4: "🙂", 5: "😄" };
-  return map[s] || "❓";
-};
+  const map = { 1: "😢", 2: "😟", 3: "😐", 4: "🙂", 5: "😄" }
+  return map[s] || "❓"
+}
 
-const latestMood = computed(() => records.value[0]?.mood_score);
-const latestConfidence = computed(() => records.value[0]?.confidence_level);
-const latestEmotionTags = computed(() => records.value[0]?.emotion_tags || []);
+const latestMood = computed(() => records.value[0]?.mood_score)
+const latestConfidence = computed(() => records.value[0]?.confidence_level)
 </script>
 
 <template>
@@ -108,11 +109,13 @@ const latestEmotionTags = computed(() => records.value[0]?.emotion_tags || []);
       <div class="card p-4">
         <div class="text-xs text-slate-500">当前情绪</div>
         <div class="text-3xl mt-1">{{ moodEmoji(latestMood) }}</div>
-        <div class="text-xs text-slate-400 mt-1">{{ latestMood ? latestMood + '/5' : '-' }}</div>
+        <div class="text-xs text-slate-400 mt-1">{{ latestMood ? latestMood + "/5" : "-" }}</div>
       </div>
       <div class="card p-4">
         <div class="text-xs text-slate-500">自信心</div>
-        <div class="text-2xl font-semibold text-slate-800 mt-1">{{ latestConfidence ? latestConfidence + '/5' : '-' }}</div>
+        <div class="text-2xl font-semibold text-slate-800 mt-1">
+          {{ latestConfidence ? latestConfidence + "/5" : "-" }}
+        </div>
       </div>
       <div class="card p-4">
         <div class="text-xs text-slate-500">记录次数</div>
@@ -142,14 +145,19 @@ const latestEmotionTags = computed(() => records.value[0]?.emotion_tags || []);
         <tbody>
           <tr v-for="r in records" :key="r.id" class="border-b border-slate-50 hover:bg-slate-50">
             <td class="py-3 px-4">{{ r.record_date }}</td>
-            <td class="py-3 px-4">{{ moodEmoji(r.mood_score) }} {{ r.mood_score ?? '-' }}/5</td>
+            <td class="py-3 px-4">{{ moodEmoji(r.mood_score) }} {{ r.mood_score ?? "-" }}/5</td>
             <td class="py-3 px-4">
-              <span v-for="tag in (r.emotion_tags || [])" :key="tag" class="inline-block px-2 py-0.5 rounded bg-brand-50 text-brand-700 text-xs mr-1 mb-1">{{ tag }}</span>
+              <span
+                v-for="tag in r.emotion_tags || []"
+                :key="tag"
+                class="inline-block px-2 py-0.5 rounded bg-brand-50 text-brand-700 text-xs mr-1 mb-1"
+                >{{ tag }}</span
+              >
               <span v-if="!r.emotion_tags?.length">-</span>
             </td>
-            <td class="py-3 px-4">{{ r.social_activity || '-' }}</td>
-            <td class="py-3 px-4">{{ r.confidence_level ? r.confidence_level + '/5' : '-' }}</td>
-            <td class="py-3 px-4 text-slate-400 max-w-[200px] truncate">{{ r.note || '-' }}</td>
+            <td class="py-3 px-4">{{ r.social_activity || "-" }}</td>
+            <td class="py-3 px-4">{{ r.confidence_level ? r.confidence_level + "/5" : "-" }}</td>
+            <td class="py-3 px-4 text-slate-400 max-w-[200px] truncate">{{ r.note || "-" }}</td>
             <td class="py-3 px-4 text-right">
               <button class="text-xs text-brand-600 hover:text-brand-700 mr-2" @click="openEdit(r)">编辑</button>
               <button class="text-xs text-rose-600 hover:text-rose-700" @click="remove(r)">删除</button>

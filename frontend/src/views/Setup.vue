@@ -20,9 +20,7 @@
         <el-form-item label="确认密码">
           <el-input v-model="form.password_confirm" type="password" show-password />
         </el-form-item>
-        <el-button type="primary" :loading="loading" class="w-full" @click="submit">
-          创建家长账号并进入
-        </el-button>
+        <el-button type="primary" :loading="loading" class="w-full" @click="submit"> 创建家长账号并进入 </el-button>
       </el-form>
       <p v-if="errMsg" class="text-red-500 text-sm mt-3 whitespace-pre-line">{{ errMsg }}</p>
 
@@ -46,15 +44,15 @@
 </template>
 
 <script setup>
-import { ref, reactive, onMounted } from "vue";
-import { useRouter } from "vue-router";
-import { useAuthStore } from "@/stores/auth";
-import { useChildStore } from "@/stores/child";
-import { configAPI } from "@/api";
+import { ref, reactive, onMounted } from "vue"
+import { useRouter } from "vue-router"
+import { useAuthStore } from "@/stores/auth"
+import { useChildStore } from "@/stores/child"
+import { configAPI } from "@/api"
 
-const router = useRouter();
-const auth = useAuthStore();
-const childStore = useChildStore();
+const router = useRouter()
+const auth = useAuthStore()
+const childStore = useChildStore()
 
 const form = reactive({
   family_name: "我的家",
@@ -62,58 +60,58 @@ const form = reactive({
   display_name: "",
   password: "",
   password_confirm: "",
-});
-const loading = ref(false);
-const errMsg = ref("");
-const lanUrl = ref("");
+})
+const loading = ref(false)
+const errMsg = ref("")
+const lanUrl = ref("")
 
 async function loadLanUrl() {
   try {
-    const cfg = await configAPI.getPublicConfig();
-    lanUrl.value = cfg.lan_url || "";
+    const cfg = await configAPI.getPublicConfig()
+    lanUrl.value = cfg.lan_url || ""
   } catch {
-    lanUrl.value = "";
+    lanUrl.value = ""
   }
 }
 
 async function submit() {
-  errMsg.value = "";
+  errMsg.value = ""
   if (!form.username || !form.password || !form.display_name) {
-    errMsg.value = "请填写完整信息";
-    return;
+    errMsg.value = "请填写完整信息"
+    return
   }
   if (form.password.length < 6) {
-    errMsg.value = "密码至少 6 位";
-    return;
+    errMsg.value = "密码至少 6 位"
+    return
   }
   if (form.password !== form.password_confirm) {
-    errMsg.value = "两次输入的密码不一致";
-    return;
+    errMsg.value = "两次输入的密码不一致"
+    return
   }
-  loading.value = true;
+  loading.value = true
   try {
     await auth.setup({
       familyName: form.family_name,
       username: form.username,
       password: form.password,
       displayName: form.display_name,
-    });
+    })
     try {
-      await childStore.loadChildren();
+      await childStore.loadChildren()
     } catch (e) {
-      console.warn("加载孩子列表失败：", e);
+      console.warn("加载孩子列表失败：", e)
     }
-    router.push("/");
+    router.push("/")
   } catch (e) {
-    errMsg.value = e.response?.data?.detail || "创建失败";
+    errMsg.value = e.response?.data?.detail || "创建失败"
   } finally {
-    loading.value = false;
+    loading.value = false
   }
 }
 
 onMounted(() => {
-  loadLanUrl();
-});
+  loadLanUrl()
+})
 </script>
 
 <style scoped>

@@ -1,27 +1,27 @@
 <script setup>
-import { computed } from "vue";
+import { computed } from "vue"
 
 const props = defineProps({
   dates: { type: Array, default: () => [] },
   series: { type: Array, default: () => [] }, // [{ name, type, smooth, data:[[date,value]...], lineStyle?, itemStyle? }]
   title: { type: String, default: "" },
-});
+})
 
 // 给"分数"系列自动分配颜色，"班均"系列固定灰色虚线
-const PALETTE = ["#6366f1", "#10b981", "#f59e0b", "#ef4444", "#8b5cf6", "#06b6d4"];
+const PALETTE = ["#6366f1", "#10b981", "#f59e0b", "#ef4444", "#8b5cf6", "#06b6d4"]
 
 const option = computed(() => {
   // 按科目分组：每科目的"分数"和"班均"成对
-  let colorIdx = 0;
+  let colorIdx = 0
   const styledSeries = props.series.map((s) => {
-    const isAvg = (s.name || "").endsWith("-班均");
+    const isAvg = (s.name || "").endsWith("-班均")
     const base = {
       ...s,
       type: "line",
       smooth: true,
       symbol: "circle",
       symbolSize: isAvg ? 5 : 6,
-    };
+    }
     if (isAvg) {
       // 班级平均线：灰色虚线
       return {
@@ -29,37 +29,37 @@ const option = computed(() => {
         lineStyle: { ...(s.lineStyle || {}), type: "dashed", width: 1.5 },
         itemStyle: { color: "#94a3b8", ...(s.itemStyle || {}) },
         z: 1,
-      };
+      }
     } else {
       // 分数线：彩色实线
-      const color = PALETTE[colorIdx % PALETTE.length];
-      colorIdx += 1;
+      const color = PALETTE[colorIdx % PALETTE.length]
+      colorIdx += 1
       return {
         ...base,
         lineStyle: { width: 2.5, ...(s.lineStyle || {}) },
         itemStyle: { color, ...(s.itemStyle || {}) },
         z: 2,
-      };
+      }
     }
-  });
+  })
 
   return {
     tooltip: {
       trigger: "axis",
       formatter: (params) => {
-        if (!params || !params.length) return "";
-        const date = new Date(params[0].value[0]);
-        const dateStr = `${date.getMonth() + 1}-${date.getDate()}`;
-        const lines = [`<div style="font-weight:600;margin-bottom:4px">${dateStr}</div>`];
+        if (!params || !params.length) return ""
+        const date = new Date(params[0].value[0])
+        const dateStr = `${date.getMonth() + 1}-${date.getDate()}`
+        const lines = [`<div style="font-weight:600;margin-bottom:4px">${dateStr}</div>`]
         params.forEach((p) => {
           lines.push(
             `<div style="display:flex;align-items:center;gap:6px;font-size:12px;margin:2px 0">` +
-            `<span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${p.color}"></span>` +
-            `<span>${p.seriesName}: <strong>${p.value[1].toFixed(1)}%</strong></span>` +
-            `</div>`
-          );
-        });
-        return lines.join("");
+              `<span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${p.color}"></span>` +
+              `<span>${p.seriesName}: <strong>${p.value[1].toFixed(1)}%</strong></span>` +
+              `</div>`,
+          )
+        })
+        return lines.join("")
       },
     },
     legend: { top: 8, icon: "circle" },
@@ -71,8 +71,8 @@ const option = computed(() => {
         color: "#64748b",
         fontSize: 11,
         formatter: (val) => {
-          const d = new Date(val);
-          return `${d.getMonth() + 1}-${d.getDate()}`;
+          const d = new Date(val)
+          return `${d.getMonth() + 1}-${d.getDate()}`
         },
       },
     },
@@ -80,12 +80,12 @@ const option = computed(() => {
       type: "value",
       // 若数据集中在 50+ / 40+，压缩底部空白，放大波动视觉
       min: (() => {
-        const vals = props.series.flatMap((s) => s.data.map((d) => d[1]));
-        if (!vals.length) return 0;
-        const m = Math.min(...vals);
-        if (m >= 50) return 50;
-        if (m >= 40) return 40;
-        return 0;
+        const vals = props.series.flatMap((s) => s.data.map((d) => d[1]))
+        if (!vals.length) return 0
+        const m = Math.min(...vals)
+        if (m >= 50) return 50
+        if (m >= 40) return 40
+        return 0
       })(),
       max: 100,
       axisLine: { show: false },
@@ -94,8 +94,8 @@ const option = computed(() => {
     },
     series: styledSeries,
     title: props.title ? { text: props.title, left: "left", textStyle: { fontSize: 14, fontWeight: 600 } } : undefined,
-  };
-});
+  }
+})
 </script>
 
 <template>
@@ -103,6 +103,6 @@ const option = computed(() => {
 </template>
 
 <script>
-import BaseChart from "./BaseChart.vue";
-export default { components: { BaseChart } };
+import BaseChart from "./BaseChart.vue"
+export default { components: { BaseChart } }
 </script>

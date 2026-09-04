@@ -7,20 +7,13 @@
           提交每个 Unit 的作品（写诗 / 制作 animal profile / 拍照片 / 调查等）— 家长点评 + 集成时间轴
         </p>
       </div>
-      <el-button type="primary" @click="showSubmitDialog = true">
-        <span class="mr-1">+</span> 提交作品
-      </el-button>
+      <el-button type="primary" @click="showSubmitDialog = true"> <span class="mr-1">+</span> 提交作品 </el-button>
     </div>
 
     <el-card shadow="never" class="!border-slate-200">
       <div class="flex flex-wrap gap-3 items-center">
         <el-select v-model="filterUnitId" placeholder="按教材单元筛选" clearable class="!w-60" @change="reload">
-          <el-option
-            v-for="u in units"
-            :key="u.id"
-            :label="`${u.code} ${u.title_en}`"
-            :value="u.id"
-          />
+          <el-option v-for="u in units" :key="u.id" :label="`${u.code} ${u.title_en}`" :value="u.id" />
         </el-select>
         <el-select v-model="filterStatus" placeholder="状态" clearable class="!w-40" @change="reload">
           <el-option label="已提交" value="submitted" />
@@ -34,12 +27,7 @@
     <div v-loading="loading">
       <el-empty v-if="!loading && works.length === 0" description="还没有作品，鼓励孩子完成 Big Task！" />
       <div v-else class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        <el-card
-          v-for="w in works"
-          :key="w.id"
-          shadow="hover"
-          class="!border-slate-200"
-        >
+        <el-card v-for="w in works" :key="w.id" shadow="hover" class="!border-slate-200">
           <div class="flex items-start justify-between">
             <div class="flex-1 min-w-0">
               <div class="text-base font-semibold text-slate-800 truncate">
@@ -60,7 +48,10 @@
           </div>
           <div v-else class="mt-3 text-xs text-slate-400 italic">（无内容）</div>
 
-          <div v-if="w.ai_score != null || w.parent_comment || w.teacher_comment" class="mt-3 pt-3 border-t border-slate-100 space-y-1.5">
+          <div
+            v-if="w.ai_score != null || w.parent_comment || w.teacher_comment"
+            class="mt-3 pt-3 border-t border-slate-100 space-y-1.5"
+          >
             <div v-if="w.ai_score != null" class="flex items-center justify-between text-xs">
               <span class="text-slate-500">🤖 AI 评分</span>
               <span class="font-bold text-brand-600">{{ w.ai_score }} / 100</span>
@@ -71,7 +62,7 @@
           </div>
 
           <div class="mt-4 flex gap-2">
-            <el-button size="small" @click="openReview(w)">{{ w.parent_comment ? '改点评' : '家长点评' }}</el-button>
+            <el-button size="small" @click="openReview(w)">{{ w.parent_comment ? "改点评" : "家长点评" }}</el-button>
             <el-button size="small" type="danger" @click="remove(w)">删除</el-button>
           </div>
         </el-card>
@@ -105,13 +96,7 @@
           <el-input v-model="form.content" type="textarea" :rows="4" placeholder="写作业、诗、profile 等" />
         </el-form-item>
         <el-form-item label="上传图片">
-          <input
-            ref="fileInputRef"
-            type="file"
-            accept="image/*"
-            class="hidden"
-            @change="onFileChange"
-          />
+          <input ref="fileInputRef" type="file" accept="image/*" class="hidden" @change="onFileChange" />
           <el-button @click="$refs.fileInputRef.click()">选择图片</el-button>
           <span v-if="form._file" class="ml-2 text-xs text-slate-500">已选：{{ form._file.name }}</span>
         </el-form-item>
@@ -149,24 +134,24 @@
 </template>
 
 <script setup>
-import { ref, onMounted, onUnmounted, reactive } from "vue";
-import { useRoute } from "vue-router";
-import { ElMessage, ElMessageBox } from "element-plus";
-import { useChildStore } from "@/stores/child";
-import { textbookAPI, projectWorksAPI } from "@/api";
+import { ref, onMounted, onUnmounted, reactive } from "vue"
+import { useRoute } from "vue-router"
+import { ElMessage, ElMessageBox } from "element-plus"
+import { useChildStore } from "@/stores/child"
+import { textbookAPI, projectWorksAPI } from "@/api"
 
-const route = useRoute();
-const childStore = useChildStore();
-let reloadTimer = null;
+const route = useRoute()
+const childStore = useChildStore()
+let reloadTimer = null
 
-const loading = ref(false);
-const works = ref([]);
-const units = ref([]);
-const filterUnitId = ref(null);
-const filterStatus = ref(null);
-const showSubmitDialog = ref(false);
-const showReviewDialog = ref(false);
-const reviewingWork = ref(null);
+const loading = ref(false)
+const works = ref([])
+const units = ref([])
+const filterUnitId = ref(null)
+const filterStatus = ref(null)
+const showSubmitDialog = ref(false)
+const showReviewDialog = ref(false)
+const reviewingWork = ref(null)
 
 const form = reactive({
   unit_id: null,
@@ -174,82 +159,82 @@ const form = reactive({
   work_type: "text",
   content: "",
   image_path: "",
-  _file: null,  // 暂存待上传的文件
-});
+  _file: null, // 暂存待上传的文件
+})
 
 const reviewForm = reactive({
   parent_comment: "",
   teacher_comment: "",
   status: "reviewed",
-});
+})
 
 function statusLabel(s) {
-  return { submitted: "已提交", reviewed: "已点评", approved: "已通过", needs_revision: "待修改" }[s] || s;
+  return { submitted: "已提交", reviewed: "已点评", approved: "已通过", needs_revision: "待修改" }[s] || s
 }
 function statusType(s) {
-  return { submitted: "info", reviewed: "warning", approved: "success", needs_revision: "danger" }[s] || "info";
+  return { submitted: "info", reviewed: "warning", approved: "success", needs_revision: "danger" }[s] || "info"
 }
 function unitTitleOf(uid) {
-  const u = units.value.find((x) => x.id === uid);
-  return u ? `${u.code} ${u.title_en}` : "(未知单元)";
+  const u = units.value.find((x) => x.id === uid)
+  return u ? `${u.code} ${u.title_en}` : "(未知单元)"
 }
 function unitCodeOf(uid) {
-  const u = units.value.find((x) => x.id === uid);
-  return u ? u.code : "";
+  const u = units.value.find((x) => x.id === uid)
+  return u ? u.code : ""
 }
 function formatDate(s) {
-  if (!s) return "";
-  return new Date(s).toLocaleString("zh-CN", { hour12: false });
+  if (!s) return ""
+  return new Date(s).toLocaleString("zh-CN", { hour12: false })
 }
 
 async function loadUnits() {
   try {
-    const versions = await textbookAPI.listVersions({ is_active: true });
-    const englishVersions = versions.filter((v) => v.subject === "英语");
-    const all = [];
+    const versions = await textbookAPI.listVersions({ is_active: true })
+    const englishVersions = versions.filter((v) => v.subject === "英语")
+    const all = []
     for (const v of englishVersions) {
-      const us = await textbookAPI.listUnits(v.id);
-      all.push(...us);
+      const us = await textbookAPI.listUnits(v.id)
+      all.push(...us)
     }
-    units.value = all;
+    units.value = all
   } catch (e) {
-    ElMessage.error("教材单元加载失败");
+    ElMessage.error("教材单元加载失败")
   }
 }
 
 async function reload() {
-  const childId = childStore.current?.id;
-  if (!childId) return;
-  loading.value = true;
+  const childId = childStore.current?.id
+  if (!childId) return
+  loading.value = true
   try {
-    const params = { child_id: childId };
-    if (filterUnitId.value) params.unit_id = filterUnitId.value;
-    if (filterStatus.value) params.status = filterStatus.value;
-    works.value = await projectWorksAPI.list(params);
+    const params = { child_id: childId }
+    if (filterUnitId.value) params.unit_id = filterUnitId.value
+    if (filterStatus.value) params.status = filterStatus.value
+    works.value = await projectWorksAPI.list(params)
   } catch (e) {
-    ElMessage.error("作品加载失败");
+    ElMessage.error("作品加载失败")
   } finally {
-    loading.value = false;
+    loading.value = false
   }
 }
 
 function onFileChange(event) {
-  const file = event.target.files?.[0];
+  const file = event.target.files?.[0]
   if (file) {
-    form._file = file;
-    form.image_path = file.name;
+    form._file = file
+    form.image_path = file.name
   }
 }
 
 async function submit() {
-  const childId = childStore.current?.id;
+  const childId = childStore.current?.id
   if (!childId) {
-    ElMessage.warning("请先选择孩子");
-    return;
+    ElMessage.warning("请先选择孩子")
+    return
   }
   if (!form.unit_id) {
-    ElMessage.warning("请选择教材单元");
-    return;
+    ElMessage.warning("请选择教材单元")
+    return
   }
   try {
     const created = await projectWorksAPI.submit({
@@ -258,64 +243,68 @@ async function submit() {
       work_type: form.work_type,
       title: form.title || undefined,
       content: form.content || undefined,
-    });
+    })
     if (form._file) {
-      await projectWorksAPI.uploadImage(created.id, form._file);
+      await projectWorksAPI.uploadImage(created.id, form._file)
     }
-    ElMessage.success("提交成功");
-    showSubmitDialog.value = false;
-    Object.assign(form, { unit_id: null, title: "", work_type: "text", content: "", image_path: "", _file: null });
-    reload();
+    ElMessage.success("提交成功")
+    showSubmitDialog.value = false
+    Object.assign(form, { unit_id: null, title: "", work_type: "text", content: "", image_path: "", _file: null })
+    reload()
   } catch (e) {
-    ElMessage.error("提交失败");
+    ElMessage.error("提交失败")
   }
 }
 
 function openReview(w) {
-  reviewingWork.value = w;
-  reviewForm.parent_comment = w.parent_comment || "";
-  reviewForm.teacher_comment = w.teacher_comment || "";
-  reviewForm.status = w.status === "submitted" ? "reviewed" : w.status;
-  showReviewDialog.value = true;
+  reviewingWork.value = w
+  reviewForm.parent_comment = w.parent_comment || ""
+  reviewForm.teacher_comment = w.teacher_comment || ""
+  reviewForm.status = w.status === "submitted" ? "reviewed" : w.status
+  showReviewDialog.value = true
 }
 
 async function saveReview() {
-  if (!reviewingWork.value) return;
+  if (!reviewingWork.value) return
   try {
     await projectWorksAPI.review(reviewingWork.value.id, {
       parent_comment: reviewForm.parent_comment || undefined,
       teacher_comment: reviewForm.teacher_comment || undefined,
       status: reviewForm.status,
-    });
-    ElMessage.success("已保存点评");
-    showReviewDialog.value = false;
-    reload();
+    })
+    ElMessage.success("已保存点评")
+    showReviewDialog.value = false
+    reload()
   } catch (e) {
-    ElMessage.error("保存失败");
+    ElMessage.error("保存失败")
   }
 }
 
 async function remove(w) {
   try {
-    await ElMessageBox.confirm("确定删除该作品？", "确认删除", { type: "warning" });
-    await projectWorksAPI.remove(w.id);
-    ElMessage.success("已删除");
-    reload();
-  } catch {}
+    await ElMessageBox.confirm("确定删除该作品？", "确认删除", { type: "warning" })
+    await projectWorksAPI.remove(w.id)
+    ElMessage.success("已删除")
+    reload()
+  } catch {
+    // 用户取消 ElMessageBox 确认（不报错）
+  }
 }
 
 onMounted(async () => {
-  await loadUnits();
-  const presetUnitId = Number(route.query.unit_id);
-  if (presetUnitId) filterUnitId.value = presetUnitId;
-  reloadTimer = setTimeout(() => reload(), 200);
-});
+  await loadUnits()
+  const presetUnitId = Number(route.query.unit_id)
+  if (presetUnitId) filterUnitId.value = presetUnitId
+  reloadTimer = setTimeout(() => reload(), 200)
+})
 
 onUnmounted(() => {
-  if (reloadTimer) clearTimeout(reloadTimer);
-});
+  if (reloadTimer) clearTimeout(reloadTimer)
+})
 </script>
 
 <style scoped>
-.hidden { display: none; }
+.hidden {
+  display: none;
+}
 </style>

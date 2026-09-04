@@ -6,21 +6,13 @@
         <h1 class="text-2xl font-bold text-slate-800">✏️ 题库练习</h1>
         <p class="text-sm text-slate-500 mt-1">管理题目、组卷出题、巩固薄弱知识点</p>
       </div>
-      <el-button type="primary" @click="showCreateBankDialog = true">
-        <span class="mr-1">+</span> 新建题库
-      </el-button>
+      <el-button type="primary" @click="showCreateBankDialog = true"> <span class="mr-1">+</span> 新建题库 </el-button>
     </div>
 
     <!-- 筛选 -->
     <el-card shadow="never" class="!border-slate-200">
       <div class="flex flex-wrap items-center gap-3">
-        <el-select
-          v-model="filterGrade"
-          placeholder="选择年级"
-          clearable
-          class="!w-36"
-          @change="fetchBanks"
-        >
+        <el-select v-model="filterGrade" placeholder="选择年级" clearable class="!w-36" @change="fetchBanks">
           <el-option label="四年级" value="四年级" />
           <el-option label="五年级" value="五年级" />
           <el-option label="六年级" value="六年级" />
@@ -28,13 +20,7 @@
           <el-option label="初二" value="初二" />
           <el-option label="初三" value="初三" />
         </el-select>
-        <el-select
-          v-model="filterSubject"
-          placeholder="选择科目"
-          clearable
-          class="!w-36"
-          @change="fetchBanks"
-        >
+        <el-select v-model="filterSubject" placeholder="选择科目" clearable class="!w-36" @change="fetchBanks">
           <el-option label="英语" value="英语" />
           <el-option label="数学" value="数学" />
           <el-option label="语文" value="语文" />
@@ -101,9 +87,7 @@
     <!-- 题目管理（选中题库后显示） -->
     <div v-if="selectedBank" class="mt-8">
       <div class="flex items-center justify-between mb-4">
-        <h2 class="text-lg font-semibold text-slate-800">
-          📝 {{ selectedBank.title }} - 题目管理
-        </h2>
+        <h2 class="text-lg font-semibold text-slate-800">📝 {{ selectedBank.title }} - 题目管理</h2>
         <el-button type="primary" @click="showCreateQuestionDialog = true">
           <span class="mr-1">+</span> 添加题目
         </el-button>
@@ -125,12 +109,12 @@
       </div>
 
       <!-- 题目列表 -->
-      <el-table :data="questions" stripe border class="!w-full" v-loading="qLoading">
+      <el-table v-loading="qLoading" :data="questions" stripe border class="!w-full">
         <el-table-column prop="id" label="ID" width="60" />
         <el-table-column prop="question_type" label="题型" width="80">
           <template #default="{ row }">
             <el-tag :type="row.question_type === 'true_false' ? 'warning' : 'primary'" size="small">
-              {{ row.question_type === 'true_false' ? '判断' : '单选' }}
+              {{ row.question_type === "true_false" ? "判断" : "单选" }}
             </el-tag>
           </template>
         </el-table-column>
@@ -145,7 +129,7 @@
         <el-table-column prop="content" label="题干" show-overflow-tooltip min-width="200" />
         <el-table-column label="选项" width="200">
           <template #default="{ row }">
-            <span class="text-xs text-slate-500">{{ row.options.join(' / ') }}</span>
+            <span class="text-xs text-slate-500">{{ row.options.join(" / ") }}</span>
           </template>
         </el-table-column>
         <el-table-column prop="correct_answer" label="答案" width="60">
@@ -258,38 +242,37 @@
 </template>
 
 <script setup>
-import { ref, reactive, computed, onMounted } from "vue";
-import { useRoute, useRouter } from "vue-router";
-import { useChildStore } from "@/stores/child";
-import { questionBanksAPI } from "@/api";
-import { ElMessage, ElMessageBox } from "element-plus";
+import { ref, reactive, computed, onMounted } from "vue"
+import { useRouter } from "vue-router"
+import { useChildStore } from "@/stores/child"
+import { questionBanksAPI } from "@/api"
+import { ElMessage, ElMessageBox } from "element-plus"
 
-const route = useRoute();
-const router = useRouter();
-const childStore = useChildStore();
+const router = useRouter()
+const childStore = useChildStore()
 
-const loading = ref(false);
-const qLoading = ref(false);
-const banks = ref([]);
-const questions = ref([]);
-const filterGrade = ref("");
-const filterSubject = ref("");
-const selectedBank = ref(null);
+const loading = ref(false)
+const qLoading = ref(false)
+const banks = ref([])
+const questions = ref([])
+const filterGrade = ref("")
+const filterSubject = ref("")
+const selectedBank = ref(null)
 
 // 题库表单
-const showCreateBankDialog = ref(false);
-const editingBank = ref(null);
+const showCreateBankDialog = ref(false)
+const editingBank = ref(null)
 const bankForm = reactive({
   grade: "四年级",
   subject: "英语",
   title: "",
   description: "",
   is_active: true,
-});
+})
 
 // 题目表单
-const showCreateQuestionDialog = ref(false);
-const editingQuestion = ref(null);
+const showCreateQuestionDialog = ref(false)
+const editingQuestion = ref(null)
 const questionForm = reactive({
   bank_id: 0,
   knowledge_point: "",
@@ -299,73 +282,73 @@ const questionForm = reactive({
   options: ["", "", "", ""],
   correct_answer: "A",
   explanation: "",
-});
+})
 
 function onQuestionTypeChange() {
   if (questionForm.question_type === "true_false") {
-    questionForm.options = ["正确", "错误", "", ""];
-    questionForm.correct_answer = "A";
+    questionForm.options = ["正确", "错误", "", ""]
+    questionForm.correct_answer = "A"
   } else {
-    questionForm.options = ["", "", "", ""];
-    questionForm.correct_answer = "A";
+    questionForm.options = ["", "", "", ""]
+    questionForm.correct_answer = "A"
   }
 }
 
 // 知识点统计
 const questionStats = computed(() => {
-  const stats = {};
+  const stats = {}
   for (const q of questions.value) {
-    stats[q.knowledge_point] = (stats[q.knowledge_point] || 0) + 1;
+    stats[q.knowledge_point] = (stats[q.knowledge_point] || 0) + 1
   }
-  return stats;
-});
+  return stats
+})
 
 async function fetchBanks() {
-  loading.value = true;
+  loading.value = true
   try {
-    const params = {};
-    if (filterGrade.value) params.grade = filterGrade.value;
-    if (filterSubject.value) params.subject = filterSubject.value;
-    banks.value = await questionBanksAPI.list(params);
+    const params = {}
+    if (filterGrade.value) params.grade = filterGrade.value
+    if (filterSubject.value) params.subject = filterSubject.value
+    banks.value = await questionBanksAPI.list(params)
   } finally {
-    loading.value = false;
+    loading.value = false
   }
 }
 
 function selectBank(bank) {
-  selectedBank.value = bank;
-  fetchQuestions(bank.id);
+  selectedBank.value = bank
+  fetchQuestions(bank.id)
 }
 
 // 一键选中 + 去练习（题库卡片里的快速入口，跳过手动选中这一步）
 function selectAndGoExercise(bank) {
-  selectBank(bank);
-  const childId = childStore.current?.id;
+  selectBank(bank)
+  const childId = childStore.current?.id
   if (!childId) {
-    ElMessage.warning("请先选择孩子");
-    return;
+    ElMessage.warning("请先选择孩子")
+    return
   }
   router.push({
     name: "exercise",
     query: { bank_id: bank.id, child_id: childId },
-  });
+  })
 }
 
 async function fetchQuestions(bankId) {
-  qLoading.value = true;
+  qLoading.value = true
   try {
-    questions.value = await questionBanksAPI.listQuestions(bankId);
+    questions.value = await questionBanksAPI.listQuestions(bankId)
   } finally {
-    qLoading.value = false;
+    qLoading.value = false
   }
 }
 
 function goToExerciseWithKP(kp) {
-  if (!selectedBank.value) return;
-  const childId = childStore.current?.id;
+  if (!selectedBank.value) return
+  const childId = childStore.current?.id
   if (!childId) {
-    ElMessage.warning("请先选择孩子");
-    return;
+    ElMessage.warning("请先选择孩子")
+    return
   }
   router.push({
     name: "exercise",
@@ -374,44 +357,44 @@ function goToExerciseWithKP(kp) {
       child_id: childId,
       knowledge_point: kp,
     },
-  });
+  })
 }
 
 function goToExercise() {
-  if (!selectedBank.value) return;
-  const childId = childStore.current?.id;
+  if (!selectedBank.value) return
+  const childId = childStore.current?.id
   if (!childId) {
-    ElMessage.warning("请先选择孩子");
-    return;
+    ElMessage.warning("请先选择孩子")
+    return
   }
   router.push({
     name: "exercise",
     query: { bank_id: selectedBank.value.id, child_id: childId },
-  });
+  })
 }
 
 function editBank(bank) {
-  editingBank.value = bank;
-  bankForm.grade = bank.grade;
-  bankForm.subject = bank.subject;
-  bankForm.title = bank.title;
-  bankForm.description = bank.description || "";
-  bankForm.is_active = bank.is_active;
-  showCreateBankDialog.value = true;
+  editingBank.value = bank
+  bankForm.grade = bank.grade
+  bankForm.subject = bank.subject
+  bankForm.title = bank.title
+  bankForm.description = bank.description || ""
+  bankForm.is_active = bank.is_active
+  showCreateBankDialog.value = true
 }
 
 async function saveBank() {
   try {
     if (editingBank.value) {
-      await questionBanksAPI.update(editingBank.value.id, bankForm);
-      ElMessage.success("更新成功");
+      await questionBanksAPI.update(editingBank.value.id, bankForm)
+      ElMessage.success("更新成功")
     } else {
-      await questionBanksAPI.create(bankForm);
-      ElMessage.success("创建成功");
+      await questionBanksAPI.create(bankForm)
+      ElMessage.success("创建成功")
     }
-    showCreateBankDialog.value = false;
-    editingBank.value = null;
-    fetchBanks();
+    showCreateBankDialog.value = false
+    editingBank.value = null
+    fetchBanks()
   } catch (e) {
     // handled by interceptor
   }
@@ -421,45 +404,45 @@ async function deleteBank(bank) {
   try {
     await ElMessageBox.confirm(`确定删除题库「${bank.title}」？题目也会被删除。`, "确认删除", {
       type: "warning",
-    });
-    await questionBanksAPI.remove(bank.id);
-    ElMessage.success("删除成功");
+    })
+    await questionBanksAPI.remove(bank.id)
+    ElMessage.success("删除成功")
     if (selectedBank.value?.id === bank.id) {
-      selectedBank.value = null;
-      questions.value = [];
+      selectedBank.value = null
+      questions.value = []
     }
-    fetchBanks();
+    fetchBanks()
   } catch {
     // cancelled
   }
 }
 
 function editQuestion(q) {
-  editingQuestion.value = q;
-  questionForm.bank_id = q.bank_id;
-  questionForm.knowledge_point = q.knowledge_point;
-  questionForm.question_type = q.question_type || "single_choice";
-  questionForm.difficulty = q.difficulty;
-  questionForm.content = q.content;
-  questionForm.options = [...q.options];
-  questionForm.correct_answer = q.correct_answer;
-  questionForm.explanation = q.explanation || "";
-  showCreateQuestionDialog.value = true;
+  editingQuestion.value = q
+  questionForm.bank_id = q.bank_id
+  questionForm.knowledge_point = q.knowledge_point
+  questionForm.question_type = q.question_type || "single_choice"
+  questionForm.difficulty = q.difficulty
+  questionForm.content = q.content
+  questionForm.options = [...q.options]
+  questionForm.correct_answer = q.correct_answer
+  questionForm.explanation = q.explanation || ""
+  showCreateQuestionDialog.value = true
 }
 
 async function saveQuestion() {
   try {
     if (editingQuestion.value) {
-      await questionBanksAPI.updateQuestion(selectedBank.value.id, editingQuestion.value.id, questionForm);
-      ElMessage.success("更新成功");
+      await questionBanksAPI.updateQuestion(selectedBank.value.id, editingQuestion.value.id, questionForm)
+      ElMessage.success("更新成功")
     } else {
-      await questionBanksAPI.createQuestion(selectedBank.value.id, questionForm);
-      ElMessage.success("添加成功");
+      await questionBanksAPI.createQuestion(selectedBank.value.id, questionForm)
+      ElMessage.success("添加成功")
     }
-    showCreateQuestionDialog.value = false;
-    editingQuestion.value = null;
-    resetQuestionForm();
-    fetchQuestions(selectedBank.value.id);
+    showCreateQuestionDialog.value = false
+    editingQuestion.value = null
+    resetQuestionForm()
+    fetchQuestions(selectedBank.value.id)
   } catch {
     // handled
   }
@@ -467,35 +450,35 @@ async function saveQuestion() {
 
 async function deleteQuestion(q) {
   try {
-    await ElMessageBox.confirm("确定删除这道题？", "确认删除", { type: "warning" });
-    await questionBanksAPI.deleteQuestion(selectedBank.value.id, q.id);
-    ElMessage.success("删除成功");
-    fetchQuestions(selectedBank.value.id);
+    await ElMessageBox.confirm("确定删除这道题？", "确认删除", { type: "warning" })
+    await questionBanksAPI.deleteQuestion(selectedBank.value.id, q.id)
+    ElMessage.success("删除成功")
+    fetchQuestions(selectedBank.value.id)
   } catch {
     // cancelled
   }
 }
 
 function resetQuestionForm() {
-  questionForm.knowledge_point = "";
-  questionForm.question_type = "single_choice";
-  questionForm.difficulty = "normal";
-  questionForm.content = "";
-  questionForm.options = ["", "", "", ""];
-  questionForm.correct_answer = "A";
-  questionForm.explanation = "";
+  questionForm.knowledge_point = ""
+  questionForm.question_type = "single_choice"
+  questionForm.difficulty = "normal"
+  questionForm.content = ""
+  questionForm.options = ["", "", "", ""]
+  questionForm.correct_answer = "A"
+  questionForm.explanation = ""
 }
 
 function difficultyType(d) {
-  return d === "easy" ? "success" : d === "hard" ? "danger" : "warning";
+  return d === "easy" ? "success" : d === "hard" ? "danger" : "warning"
 }
 function difficultyLabel(d) {
-  return d === "easy" ? "简单" : d === "hard" ? "困难" : "中等";
+  return d === "easy" ? "简单" : d === "hard" ? "困难" : "中等"
 }
 
 onMounted(() => {
-  fetchBanks();
-});
+  fetchBanks()
+})
 </script>
 
 <style scoped>

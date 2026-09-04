@@ -7,23 +7,23 @@
  * - getPercentileLabel(category) -> string
  */
 
-const API_BASE = import.meta.env.VITE_API_BASE || "";
+const API_BASE = import.meta.env.VITE_API_BASE || ""
 
 // Cache standards in memory (they don't change during session)
-let _standardsCache = null;
+let _standardsCache = null
 
 export async function fetchStandards() {
-  if (_standardsCache) return _standardsCache;
-  const res = await fetch(`${API_BASE}/api/growth/standards`);
-  if (!res.ok) throw new Error(`Failed to fetch standards: ${res.status}`);
-  _standardsCache = await res.json();
-  return _standardsCache;
+  if (_standardsCache) return _standardsCache
+  const res = await fetch(`${API_BASE}/api/growth/standards`)
+  if (!res.ok) throw new Error(`Failed to fetch standards: ${res.status}`)
+  _standardsCache = await res.json()
+  return _standardsCache
 }
 
 export function computeBMI(heightCm, weightKg) {
-  if (!heightCm || !weightKg || heightCm <= 0 || weightKg <= 0) return null;
-  const h = heightCm / 100;
-  return Math.round((weightKg / (h * h)) * 100) / 100;
+  if (!heightCm || !weightKg || heightCm <= 0 || weightKg <= 0) return null
+  const h = heightCm / 100
+  return Math.round((weightKg / (h * h)) * 100) / 100
 }
 
 /**
@@ -32,34 +32,36 @@ export function computeBMI(heightCm, weightKg) {
  */
 export function assessBMI(bmi, gender, ageMonths) {
   if (bmi == null || ageMonths == null) {
-    return { category: "unknown", label: "-", color: "default", source: "-" };
+    return { category: "unknown", label: "-", color: "default", source: "-" }
   }
-  const g = (gender || "male").toLowerCase();
+  const g = (gender || "male").toLowerCase()
   if (ageMonths <= 83) {
     // 0-83 月: WS/T 423-2022 百分位法
-    const row = _standardsCache?.bmi_0_83_months?.[g]?.[String(ageMonths)];
-    if (!row) return { category: "unknown", label: "-", color: "default", source: "-" };
-    const [p3, p15, p50, p85, p97] = row;
-    if (bmi < p3) return { category: "thin", label: "偏瘦", color: "info", source: "WS/T 423-2022（百分位法）" };
-    if (bmi < p15) return { category: "thin", label: "偏瘦", color: "info", source: "WS/T 423-2022（百分位法）" };
-    if (bmi <= p50) return { category: "normal", label: "正常", color: "success", source: "WS/T 423-2022（百分位法）" };
-    if (bmi <= p85) return { category: "normal", label: "正常", color: "success", source: "WS/T 423-2022（百分位法）" };
-    if (bmi < p97) return { category: "overweight", label: "偏胖", color: "warning", source: "WS/T 423-2022（百分位法）" };
-    return { category: "obese", label: "肥胖", color: "danger", source: "WS/T 423-2022（百分位法）" };
+    const row = _standardsCache?.bmi_0_83_months?.[g]?.[String(ageMonths)]
+    if (!row) return { category: "unknown", label: "-", color: "default", source: "-" }
+    const [p3, p15, p50, p85, p97] = row
+    if (bmi < p3) return { category: "thin", label: "偏瘦", color: "info", source: "WS/T 423-2022（百分位法）" }
+    if (bmi < p15) return { category: "thin", label: "偏瘦", color: "info", source: "WS/T 423-2022（百分位法）" }
+    if (bmi <= p50) return { category: "normal", label: "正常", color: "success", source: "WS/T 423-2022（百分位法）" }
+    if (bmi <= p85) return { category: "normal", label: "正常", color: "success", source: "WS/T 423-2022（百分位法）" }
+    if (bmi < p97)
+      return { category: "overweight", label: "偏胖", color: "warning", source: "WS/T 423-2022（百分位法）" }
+    return { category: "obese", label: "肥胖", color: "danger", source: "WS/T 423-2022（百分位法）" }
   }
   if (ageMonths > 216) {
-    return { category: "unknown", label: "-", color: "default", source: "-" };
+    return { category: "unknown", label: "-", color: "default", source: "-" }
   }
   // 6-18 岁: WS/T 586-2018
-  const ageStr = String(Math.round((ageMonths / 12) * 2) / 2);
-  const cutoffs = _standardsCache?.bmi_cutoffs_6_18?.[g]?.[ageStr];
+  const ageStr = String(Math.round((ageMonths / 12) * 2) / 2)
+  const cutoffs = _standardsCache?.bmi_cutoffs_6_18?.[g]?.[ageStr]
   if (!cutoffs) {
-    return { category: "unknown", label: "-", color: "default", source: "-" };
+    return { category: "unknown", label: "-", color: "default", source: "-" }
   }
-  const [ow, ob] = cutoffs;
-  if (bmi >= ob) return { category: "obese", label: "肥胖", color: "danger", source: "WS/T 586-2018", cutoff: cutoffs };
-  if (bmi >= ow) return { category: "overweight", label: "超重", color: "warning", source: "WS/T 586-2018", cutoff: cutoffs };
-  return { category: "normal", label: "正常", color: "success", source: "WS/T 586-2018", cutoff: cutoffs };
+  const [ow, ob] = cutoffs
+  if (bmi >= ob) return { category: "obese", label: "肥胖", color: "danger", source: "WS/T 586-2018", cutoff: cutoffs }
+  if (bmi >= ow)
+    return { category: "overweight", label: "超重", color: "warning", source: "WS/T 586-2018", cutoff: cutoffs }
+  return { category: "normal", label: "正常", color: "success", source: "WS/T 586-2018", cutoff: cutoffs }
 }
 
 /**
@@ -74,8 +76,8 @@ export function getPercentileLabel(category) {
     up: "上（≥P97）",
     unknown: "-",
     approximate: "需医生评估",
-  };
-  return map[category] || "-";
+  }
+  return map[category] || "-"
 }
 
 export const BMI_COLORS = {
@@ -84,13 +86,13 @@ export const BMI_COLORS = {
   obese: "#ef4444",
   unknown: "#94a3b8",
   approximate: "#6366f1",
-};
+}
 
 // In-memory standards reference (set after fetchStandards)
 export function setStandards(data) {
-  _standardsCache = data;
+  _standardsCache = data
 }
 
 export function getStandards() {
-  return _standardsCache;
+  return _standardsCache
 }

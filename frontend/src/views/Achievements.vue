@@ -1,78 +1,81 @@
 <script setup>
-import { ref, computed, onMounted, watch } from "vue";
-import { useChildStore } from "@/stores/child";
-import { rewardsAPI, examsAPI } from "@/api";
-import AchIcon from "@/components/AchIcon.vue";
+import { ref, computed, onMounted, watch } from "vue"
+import { useChildStore } from "@/stores/child"
+import { rewardsAPI, examsAPI } from "@/api"
+import AchIcon from "@/components/AchIcon.vue"
 
-const childStore = useChildStore();
-const childId = computed(() => childStore.current?.id);
+const childStore = useChildStore()
+const childId = computed(() => childStore.current?.id)
 
-const loading = ref(false);
-const achievements = ref([]);
-const childAchievements = ref([]);
-const exams = ref([]);
+const loading = ref(false)
+const achievements = ref([])
+const childAchievements = ref([])
+const exams = ref([])
 
 const fetchAll = async () => {
-  if (!childId.value) return;
-  loading.value = true;
+  if (!childId.value) return
+  loading.value = true
   try {
     const [all, mine, examList] = await Promise.all([
       rewardsAPI.listAchievements(),
       rewardsAPI.childAchievements(childId.value),
       examsAPI.list({ child_id: childId.value }).catch(() => []),
-    ]);
-    achievements.value = all;
-    childAchievements.value = mine;
-    exams.value = examList;
-  } catch (e) { /* axios 已提示 */ }
-  finally { loading.value = false; }
-};
+    ])
+    achievements.value = all
+    childAchievements.value = mine
+    exams.value = examList
+  } catch (e) {
+    /* axios 已提示 */
+  } finally {
+    loading.value = false
+  }
+}
 
-onMounted(fetchAll);
-watch(() => childStore.currentId, fetchAll);
+onMounted(fetchAll)
+watch(() => childStore.currentId, fetchAll)
 
 // 按成就聚合：获得次数、首次/最近获得时间
 const earnedStats = computed(() => {
-  const map = new Map();
+  const map = new Map()
   for (const ca of childAchievements.value) {
-    const s = map.get(ca.achievement_id);
+    const s = map.get(ca.achievement_id)
     if (s) {
-      s.count += 1;
-      if (ca.earned_date && ca.earned_date < s.earliest) s.earliest = ca.earned_date;
-      if (ca.earned_date && ca.earned_date > s.latest) s.latest = ca.earned_date;
+      s.count += 1
+      if (ca.earned_date && ca.earned_date < s.earliest) s.earliest = ca.earned_date
+      if (ca.earned_date && ca.earned_date > s.latest) s.latest = ca.earned_date
     } else {
       map.set(ca.achievement_id, {
         count: 1,
         earliest: ca.earned_date || "",
         latest: ca.earned_date || "",
-      });
+      })
     }
   }
-  return map;
-});
-const earnedIds = computed(() => new Set(earnedStats.value.keys()));
+  return map
+})
+const earnedIds = computed(() => new Set(earnedStats.value.keys()))
 
 // 汇总统计
-const unlockedCount = computed(() => earnedIds.value.size);
-const totalEarnedCount = computed(() => childAchievements.value.length);
+const unlockedCount = computed(() => earnedIds.value.size)
+const totalEarnedCount = computed(() => childAchievements.value.length)
 
 // 点击卡片查看获得历史
-const detailAch = ref(null);
-const examMap = computed(() => new Map(exams.value.map(e => [e.id, e])));
+const detailAch = ref(null)
+const examMap = computed(() => new Map(exams.value.map((e) => [e.id, e])))
 const detailRecords = computed(() => {
-  if (!detailAch.value) return [];
+  if (!detailAch.value) return []
   return childAchievements.value
-    .filter(ca => ca.achievement_id === detailAch.value.id)
-    .sort((a, b) => (a.earned_date < b.earned_date ? 1 : a.earned_date > b.earned_date ? -1 : b.id - a.id));
-});
+    .filter((ca) => ca.achievement_id === detailAch.value.id)
+    .sort((a, b) => (a.earned_date < b.earned_date ? 1 : a.earned_date > b.earned_date ? -1 : b.id - a.id))
+})
 const examLabel = (examId) => {
-  const e = examMap.value.get(examId);
-  return e ? `${e.exam_name} · ${e.subject}` : "";
-};
+  const e = examMap.value.get(examId)
+  return e ? `${e.exam_name} · ${e.subject}` : ""
+}
 const openDetail = (ach) => {
-  if (!earnedIds.value.has(ach.id)) return;
-  detailAch.value = ach;
-};
+  if (!earnedIds.value.has(ach.id)) return
+  detailAch.value = ach
+}
 </script>
 
 <template>
@@ -82,8 +85,9 @@ const openDetail = (ach) => {
       <p class="text-sm text-slate-500 mt-0.5">
         考试表现自动解锁成就徽章 · 满分/高分/进步等成就可多次获得
         <template v-if="achievements.length">
-          · 已解锁 <span class="text-brand-600 font-medium">{{ unlockedCount }}</span>/{{ achievements.length }} 类，
-          累计获得 <span class="text-brand-600 font-medium">{{ totalEarnedCount }}</span> 次
+          · 已解锁 <span class="text-brand-600 font-medium">{{ unlockedCount }}</span
+          >/{{ achievements.length }} 类， 累计获得
+          <span class="text-brand-600 font-medium">{{ totalEarnedCount }}</span> 次
         </template>
       </p>
     </div>
@@ -91,10 +95,14 @@ const openDetail = (ach) => {
     <div v-if="loading" class="text-center py-10 text-slate-400">加载中…</div>
 
     <div v-else-if="achievements.length" class="grid grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
-      <div v-for="ach in achievements" :key="ach.id"
+      <div
+        v-for="ach in achievements"
+        :key="ach.id"
         class="card p-3 text-center transition"
         :class="[
-          earnedIds.has(ach.id) ? 'border-brand-200 bg-brand-50/30 cursor-pointer hover:shadow-md' : 'opacity-40 grayscale',
+          earnedIds.has(ach.id)
+            ? 'border-brand-200 bg-brand-50/30 cursor-pointer hover:shadow-md'
+            : 'opacity-40 grayscale',
         ]"
         @click="openDetail(ach)"
       >
@@ -107,7 +115,7 @@ const openDetail = (ach) => {
           </span>
           <div class="text-[11px] text-slate-400 mt-1 leading-4">
             <template v-if="earnedStats.get(ach.id).count > 1">
-              首次 {{ earnedStats.get(ach.id).earliest }}<br>最近 {{ earnedStats.get(ach.id).latest }}
+              首次 {{ earnedStats.get(ach.id).earliest }}<br />最近 {{ earnedStats.get(ach.id).latest }}
             </template>
             <template v-else>{{ earnedStats.get(ach.id).earliest }} 获得</template>
           </div>
@@ -122,11 +130,18 @@ const openDetail = (ach) => {
     </div>
 
     <!-- 获得历史弹窗 -->
-    <div v-if="detailAch" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40"
-      @click.self="detailAch = null">
+    <div
+      v-if="detailAch"
+      class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40"
+      @click.self="detailAch = null"
+    >
       <div class="relative bg-white rounded-xl shadow-xl w-full max-w-sm p-5">
-        <button class="absolute top-3 right-3 text-slate-400 hover:text-slate-600 text-lg leading-none"
-          @click="detailAch = null">✕</button>
+        <button
+          class="absolute top-3 right-3 text-slate-400 hover:text-slate-600 text-lg leading-none"
+          @click="detailAch = null"
+        >
+          ✕
+        </button>
         <div class="flex items-center gap-3 mb-1">
           <div class="text-3xl"><AchIcon :icon="detailAch.icon" /></div>
           <div>

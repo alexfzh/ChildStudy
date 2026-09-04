@@ -1,9 +1,9 @@
 <script setup>
-import { computed } from "vue";
+import { computed } from "vue"
 
 const props = defineProps({
   icon: { type: String, default: "" },
-});
+})
 
 // 自定义 SVG 图标：icon 字段以 "svg:" 开头时按 key 渲染矢量图标
 const CUSTOM_SVGS = {
@@ -22,13 +22,13 @@ const CUSTOM_SVGS = {
     <ellipse cx="32" cy="23.2" rx="19.5" ry="6.5" fill="url(#achGoldG)"/>
     <path d="M23 31 Q26 42 27.5 50" stroke="#FFF3C4" stroke-width="3" stroke-linecap="round" fill="none" opacity="0.75"/>
   </svg>`,
-};
+}
 
 const svg = computed(() => {
-  const raw = props.icon || "";
-  if (raw.startsWith("svg:")) return CUSTOM_SVGS[raw.slice(4)] || null;
-  return null;
-});
+  const raw = props.icon || ""
+  if (raw.startsWith("svg:")) return CUSTOM_SVGS[raw.slice(4)] || null
+  return null
+})
 </script>
 
 <template>

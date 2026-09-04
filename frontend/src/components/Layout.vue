@@ -1,30 +1,28 @@
 <script setup>
-import { computed, ref } from "vue";
-import { useRoute, useRouter } from "vue-router";
-import { useChildStore } from "@/stores/child";
-import { useAuthStore } from "@/stores/auth";
-import { ElMessageBox } from "element-plus";
-import ChildSelector from "./ChildSelector.vue";
+import { computed, ref } from "vue"
+import { useRoute, useRouter } from "vue-router"
+import { useAuthStore } from "@/stores/auth"
+import { ElMessageBox } from "element-plus"
+import ChildSelector from "./ChildSelector.vue"
 
-const route = useRoute();
-const router = useRouter();
-const auth = useAuthStore();
-const childStore = useChildStore();
-const sidebarOpen = ref(false);
+const route = useRoute()
+const router = useRouter()
+const auth = useAuthStore()
+const sidebarOpen = ref(false)
 
 const avatarChar = computed(() => {
-  const name = auth.user?.display_name || "";
-  return name ? name.charAt(0) : "?";
-});
+  const name = auth.user?.display_name || ""
+  return name ? name.charAt(0) : "?"
+})
 
 async function handleLogout() {
   try {
-    await ElMessageBox.confirm("确定要退出登录吗？", "确认", { type: "warning" });
+    await ElMessageBox.confirm("确定要退出登录吗？", "确认", { type: "warning" })
   } catch {
-    return; // 用户取消
+    return // 用户取消
   }
-  auth.logout();
-  router.push("/login");
+  auth.logout()
+  router.push("/login")
 }
 
 const navGroups = [
@@ -44,7 +42,13 @@ const navGroups = [
       { name: "knowledge-points", path: "/knowledge-points", label: "知识点标签库", icon: "🏷️", roles: ["parent"] },
       { name: "wrong-questions", path: "/wrong-questions", label: "错题本", icon: "📙", roles: ["parent", "child"] },
       { name: "question-banks", path: "/question-banks", label: "题库练习", icon: "✏️", roles: ["parent", "child"] },
-      { name: "study-progress", path: "/study-progress", label: "教材学习进度", icon: "📚", roles: ["parent", "child"] },
+      {
+        name: "study-progress",
+        path: "/study-progress",
+        label: "教材学习进度",
+        icon: "📚",
+        roles: ["parent", "child"],
+      },
       { name: "ai-reports", path: "/ai-reports", label: "AI 报告管理", icon: "🤖", roles: ["parent"] },
     ],
   },
@@ -72,36 +76,32 @@ const navGroups = [
       { name: "about", path: "/about", label: "关于系统", icon: "ℹ️", roles: ["parent", "child"] },
     ],
   },
-];
+]
 
 // 按角色过滤菜单项：孩子只看白名单，家长看全部
 const canSee = (item) => {
-  const roles = item.roles || ["parent", "child"];
-  return auth.isChild ? roles.includes("child") : roles.includes("parent");
-};
+  const roles = item.roles || ["parent", "child"]
+  return auth.isChild ? roles.includes("child") : roles.includes("parent")
+}
 
 // 分组菜单（概览/学业/激励/成长/系统）
-const groupExpanded = ref(navGroups.map(() => true));
+const groupExpanded = ref(navGroups.map(() => true))
 
 const toggleGroup = (idx) => {
-  groupExpanded.value[idx] = !groupExpanded.value[idx];
-};
+  groupExpanded.value[idx] = !groupExpanded.value[idx]
+}
 
-const currentTitle = computed(() => route.meta.title || "");
+const currentTitle = computed(() => route.meta.title || "")
 
 const closeSidebar = () => {
-  sidebarOpen.value = false;
-};
+  sidebarOpen.value = false
+}
 </script>
 
 <template>
   <div class="flex h-screen overflow-hidden">
     <!-- 移动端遮罩 -->
-    <div
-      v-if="sidebarOpen"
-      class="fixed inset-0 bg-black/40 z-30 md:hidden"
-      @click="closeSidebar"
-    />
+    <div v-if="sidebarOpen" class="fixed inset-0 bg-black/40 z-30 md:hidden" @click="closeSidebar" />
 
     <!-- 侧边栏 -->
     <aside
@@ -114,7 +114,9 @@ const closeSidebar = () => {
       <!-- Logo -->
       <div class="px-5 py-5 border-b border-slate-100 flex items-center justify-between">
         <div class="flex items-center gap-2">
-          <div class="w-9 h-9 rounded-xl bg-gradient-to-br from-brand-500 to-brand-700 flex items-center justify-center text-white text-lg shadow-sm">
+          <div
+            class="w-9 h-9 rounded-xl bg-gradient-to-br from-brand-500 to-brand-700 flex items-center justify-center text-white text-lg shadow-sm"
+          >
             🌱
           </div>
           <div>
@@ -142,10 +144,9 @@ const closeSidebar = () => {
             @click="toggleGroup(gIdx)"
           >
             <span>{{ group.label }}</span>
-            <span
-              class="text-xs transition-transform duration-200"
-              :class="groupExpanded[gIdx] ? 'rotate-180' : ''"
-            >▾</span>
+            <span class="text-xs transition-transform duration-200" :class="groupExpanded[gIdx] ? 'rotate-180' : ''"
+              >▾</span
+            >
           </button>
           <!-- 菜单项 -->
           <div
@@ -169,7 +170,7 @@ const closeSidebar = () => {
 
       <!-- 底部提示 -->
       <div class="px-4 py-3 border-t border-slate-100 text-[11px] text-slate-400 leading-relaxed">
-        💡 数据完全本地存储<br/>
+        💡 数据完全本地存储<br />
         隐私优先 · 离线可用
       </div>
     </aside>
@@ -177,10 +178,15 @@ const closeSidebar = () => {
     <!-- 主内容 -->
     <main class="flex-1 flex flex-col overflow-hidden w-full min-w-0">
       <!-- 顶栏 -->
-      <header class="h-14 bg-white border-b border-slate-200 flex items-center justify-between px-4 md:px-6 flex-shrink-0">
+      <header
+        class="h-14 bg-white border-b border-slate-200 flex items-center justify-between px-4 md:px-6 flex-shrink-0"
+      >
         <div class="flex items-center gap-3">
           <!-- 移动端菜单按钮 -->
-          <button class="md:hidden text-slate-600 hover:text-slate-800 text-xl leading-none" @click="sidebarOpen = true">
+          <button
+            class="md:hidden text-slate-600 hover:text-slate-800 text-xl leading-none"
+            @click="sidebarOpen = true"
+          >
             ☰
           </button>
           <div class="font-semibold text-slate-800">{{ currentTitle }}</div>
@@ -191,9 +197,12 @@ const closeSidebar = () => {
               <span
                 class="w-8 h-8 rounded-full flex items-center justify-center text-white font-medium shadow-sm"
                 :style="{ background: auth.user?.avatar_color || '#6366f1' }"
-              >{{ avatarChar }}</span>
+                >{{ avatarChar }}</span
+              >
               <span class="hidden md:inline text-sm text-slate-700">{{ auth.user?.display_name }}</span>
-              <span class="hidden md:inline text-xs text-slate-400 ml-1">({{ auth.user?.role === 'parent' ? '家长' : '孩子' }})</span>
+              <span class="hidden md:inline text-xs text-slate-400 ml-1"
+                >({{ auth.user?.role === "parent" ? "家长" : "孩子" }})</span
+              >
               <span class="text-slate-400 text-xs">▾</span>
             </button>
             <template #dropdown>

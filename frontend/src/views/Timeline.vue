@@ -1,19 +1,19 @@
 <script setup>
-import { ref, computed, onMounted, watch } from "vue";
-import { ElMessage, ElMessageBox } from "element-plus";
-import dayjs from "dayjs";
-import { useChildStore } from "@/stores/child";
-import { useAuthStore } from "@/stores/auth";
-import { timelineAPI } from "@/api";
+import { ref, computed, onMounted, watch } from "vue"
+import { ElMessage, ElMessageBox } from "element-plus"
+import dayjs from "dayjs"
+import { useChildStore } from "@/stores/child"
+import { useAuthStore } from "@/stores/auth"
+import { timelineAPI } from "@/api"
 
-const childStore = useChildStore();
-const auth = useAuthStore();
-const readOnly = computed(() => auth.isChild); // 孩子账号只能查看
+const childStore = useChildStore()
+const auth = useAuthStore()
+const readOnly = computed(() => auth.isChild) // 孩子账号只能查看
 
-const loading = ref(false);
-const events = ref([]);
-const filterType = ref("");
-const keyword = ref("");
+const loading = ref(false)
+const events = ref([])
+const filterType = ref("")
+const keyword = ref("")
 
 const blank = () => ({
   child_id: childStore.currentId,
@@ -23,111 +23,110 @@ const blank = () => ({
   event_date: dayjs().format("YYYY-MM-DD"),
   tags: [],
   attachments: [],
-});
+})
 
-const form = ref(blank());
-const dialogVisible = ref(false);
-const editing = ref(null);
+const form = ref(blank())
+const dialogVisible = ref(false)
+const editing = ref(null)
 
 // 附件上传
-const fileInputRef = ref(null);
+const fileInputRef = ref(null)
 
 const readFilesAsBase64 = async (files) => {
   const toBase64 = (file) =>
     new Promise((resolve) => {
-      const reader = new FileReader();
-      reader.onload = () => resolve(reader.result);
-      reader.readAsDataURL(file);
-    });
-  return Promise.all(Array.from(files).map(toBase64));
-};
+      const reader = new FileReader()
+      reader.onload = () => resolve(reader.result)
+      reader.readAsDataURL(file)
+    })
+  return Promise.all(Array.from(files).map(toBase64))
+}
 
 const onFilesSelected = async (e) => {
-  const bases = await readFilesAsBase64(e.target.files);
-  form.value.attachments = [...(form.value.attachments || []), ...bases];
-  if (fileInputRef.value) fileInputRef.value.value = "";
-};
+  const bases = await readFilesAsBase64(e.target.files)
+  form.value.attachments = [...(form.value.attachments || []), ...bases]
+  if (fileInputRef.value) fileInputRef.value.value = ""
+}
 
 const removeAttachment = (idx) => {
-  form.value.attachments.splice(idx, 1);
-};
+  form.value.attachments.splice(idx, 1)
+}
 
 const fetchList = async () => {
-  if (!childStore.currentId) return;
-  loading.value = true;
+  if (!childStore.currentId) return
+  loading.value = true
   try {
     events.value = await timelineAPI.list({
       child_id: childStore.currentId,
       event_type: filterType.value || undefined,
       keyword: keyword.value.trim() || undefined,
-    });
+    })
   } finally {
-    loading.value = false;
+    loading.value = false
   }
-};
+}
 
-onMounted(fetchList);
-watch(() => childStore.currentId, fetchList);
-watch(filterType, fetchList);
-watch(keyword, fetchList);
+onMounted(fetchList)
+watch(() => childStore.currentId, fetchList)
+watch(filterType, fetchList)
+watch(keyword, fetchList)
 
 const openCreate = () => {
-  editing.value = null;
-  form.value = blank();
-  dialogVisible.value = true;
-};
+  editing.value = null
+  form.value = blank()
+  dialogVisible.value = true
+}
 const openEdit = (e) => {
-  editing.value = e;
-  form.value = { ...blank(), ...e, tags: [...(e.tags || [])] };
-  dialogVisible.value = true;
-};
+  editing.value = e
+  form.value = { ...blank(), ...e, tags: [...(e.tags || [])] }
+  dialogVisible.value = true
+}
 
 const submit = async () => {
   if (!form.value.title) {
-    ElMessage.warning("请填写事件标题");
-    return;
+    ElMessage.warning("请填写事件标题")
+    return
   }
   if (editing.value) {
-    await timelineAPI.update(editing.value.id, form.value);
-    ElMessage.success("已更新");
+    await timelineAPI.update(editing.value.id, form.value)
+    ElMessage.success("已更新")
   } else {
-    await timelineAPI.create(form.value);
-    ElMessage.success("已添加");
+    await timelineAPI.create(form.value)
+    ElMessage.success("已添加")
   }
-  dialogVisible.value = false;
-  await fetchList();
-};
+  dialogVisible.value = false
+  await fetchList()
+}
 
 const remove = async (e) => {
-  await ElMessageBox.confirm(`确认删除「${e.title}」吗？`, "删除", { type: "warning" });
-  await timelineAPI.remove(e.id);
-  ElMessage.success("已删除");
-  await fetchList();
-};
+  await ElMessageBox.confirm(`确认删除「${e.title}」吗？`, "删除", { type: "warning" })
+  await timelineAPI.remove(e.id)
+  ElMessage.success("已删除")
+  await fetchList()
+}
 
-const typeMeta = (t) => ({
-  exam: { label: "考试", color: "bg-brand-100 text-brand-700", icon: "📝" },
-  award: { label: "荣誉", color: "bg-amber-100 text-amber-700", icon: "🏆" },
-  milestone: { label: "里程碑", color: "bg-emerald-100 text-emerald-700", icon: "🌟" },
-  note: { label: "日常", color: "bg-slate-100 text-slate-600", icon: "📌" },
-})[t] || { label: t, color: "bg-slate-100 text-slate-600", icon: "📌" };
+const typeMeta = (t) =>
+  ({
+    exam: { label: "考试", color: "bg-brand-100 text-brand-700", icon: "📝" },
+    award: { label: "荣誉", color: "bg-amber-100 text-amber-700", icon: "🏆" },
+    milestone: { label: "里程碑", color: "bg-emerald-100 text-emerald-700", icon: "🌟" },
+    note: { label: "日常", color: "bg-slate-100 text-slate-600", icon: "📌" },
+  })[t] || { label: t, color: "bg-slate-100 text-slate-600", icon: "📌" }
 
 // 按年月分组
 const grouped = () => {
-  const groups = {};
+  const groups = {}
   events.value.forEach((e) => {
-    const key = dayjs(e.event_date).format("YYYY 年 MM 月");
-    if (!groups[key]) groups[key] = [];
-    groups[key].push(e);
-  });
-  return groups;
-};
+    const key = dayjs(e.event_date).format("YYYY 年 MM 月")
+    if (!groups[key]) groups[key] = []
+    groups[key].push(e)
+  })
+  return groups
+}
 </script>
 
 <template>
-  <div v-if="!childStore.currentId" class="card p-10 text-center text-slate-500">
-    请先在「孩子档案」中添加孩子
-  </div>
+  <div v-if="!childStore.currentId" class="card p-10 text-center text-slate-500">请先在「孩子档案」中添加孩子</div>
 
   <div v-else>
     <div class="flex items-center justify-between mb-4 flex-wrap gap-2">
@@ -177,7 +176,9 @@ const grouped = () => {
 
         <div v-for="e in items" :key="e.id" class="relative mb-3 card p-4 hover:shadow-soft transition-shadow">
           <!-- 时间线节点 -->
-          <div class="absolute -left-[26px] top-5 w-4 h-4 rounded-full bg-white border-2 border-brand-500 flex items-center justify-center text-[10px]">
+          <div
+            class="absolute -left-[26px] top-5 w-4 h-4 rounded-full bg-white border-2 border-brand-500 flex items-center justify-center text-[10px]"
+          >
             {{ typeMeta(e.event_type).icon }}
           </div>
 
@@ -193,7 +194,12 @@ const grouped = () => {
                 <span v-for="t in e.tags" :key="t" class="badge bg-slate-100 text-slate-600">#{{ t }}</span>
               </div>
               <div v-if="e.attachments?.length" class="flex flex-wrap gap-2 mt-3">
-                <img v-for="(a, i) in e.attachments" :key="i" :src="a" class="w-16 h-16 object-cover rounded border border-slate-200" />
+                <img
+                  v-for="(a, i) in e.attachments"
+                  :key="i"
+                  :src="a"
+                  class="w-16 h-16 object-cover rounded border border-slate-200"
+                />
               </div>
             </div>
             <div v-if="!readOnly" class="flex gap-1">
@@ -224,17 +230,39 @@ const grouped = () => {
           <el-input v-model="form.description" type="textarea" :rows="3" placeholder="记录这个时刻的细节" />
         </el-form-item>
         <el-form-item label="标签">
-          <el-input v-model="form.tagsText" placeholder="逗号分隔，如：阅读, 演讲" @input="form.tags = $event.split(/[,，]/).map(s => s.trim()).filter(Boolean)" />
+          <el-input
+            v-model="form.tagsText"
+            placeholder="逗号分隔，如：阅读, 演讲"
+            @input="
+              form.tags = $event
+                .split(/[,，]/)
+                .map((s) => s.trim())
+                .filter(Boolean)
+            "
+          />
           <div class="flex flex-wrap gap-1 mt-2">
             <span v-for="t in form.tags" :key="t" class="badge bg-slate-100 text-slate-600">#{{ t }}</span>
           </div>
         </el-form-item>
         <el-form-item label="附件">
-          <input ref="fileInputRef" type="file" multiple accept="image/*" class="block text-sm" @change="onFilesSelected" />
+          <input
+            ref="fileInputRef"
+            type="file"
+            multiple
+            accept="image/*"
+            class="block text-sm"
+            @change="onFilesSelected"
+          />
           <div v-if="form.attachments?.length" class="flex flex-wrap gap-2 mt-2">
             <div v-for="(a, i) in form.attachments" :key="i" class="relative w-16 h-16">
               <img :src="a" class="w-16 h-16 object-cover rounded border border-slate-200" />
-              <button type="button" class="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-rose-500 text-white text-[10px] leading-4 text-center" @click.prevent="removeAttachment(i)">×</button>
+              <button
+                type="button"
+                class="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-rose-500 text-white text-[10px] leading-4 text-center"
+                @click.prevent="removeAttachment(i)"
+              >
+                ×
+              </button>
             </div>
           </div>
         </el-form-item>

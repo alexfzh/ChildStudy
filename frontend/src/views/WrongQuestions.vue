@@ -1,41 +1,40 @@
 <script setup>
-import { ref, computed, onMounted, watch } from "vue";
-import { useRoute, useRouter } from "vue-router";
-import { ElMessage, ElMessageBox } from "element-plus";
-import { useChildStore } from "@/stores/child";
-import { wrongQuestionsAPI, questionBanksAPI } from "@/api";
+import { ref, computed, onMounted, watch } from "vue"
+import { useRouter } from "vue-router"
+import { ElMessage, ElMessageBox } from "element-plus"
+import { useChildStore } from "@/stores/child"
+import { wrongQuestionsAPI, questionBanksAPI } from "@/api"
 
-const route = useRoute();
-const router = useRouter();
-const childStore = useChildStore();
+const router = useRouter()
+const childStore = useChildStore()
 
-const childId = computed(() => childStore.current?.id);
-const loading = ref(false);
-const items = ref([]);
-const stats = ref(null);
-const todayCount = ref(0);
+const childId = computed(() => childStore.current?.id)
+const loading = ref(false)
+const items = ref([])
+const stats = ref(null)
+const todayCount = ref(0)
 
 const filters = ref({
   subject: "",
   mastery_level: "",
   status: "",
   keyword: "",
-});
+})
 
 const masteryOptions = [
   { label: "新错题", value: "new" },
   { label: "学习中", value: "learning" },
   { label: "已掌握", value: "mastered" },
-];
+]
 
 const statusOptions = [
   { label: "active", value: "active" },
   { label: "mastered", value: "mastered" },
   { label: "archived", value: "archived" },
-];
+]
 
-const dialogVisible = ref(false);
-const editing = ref(null);
+const dialogVisible = ref(false)
+const editing = ref(null)
 const form = ref({
   subject: "",
   question_text: "",
@@ -46,11 +45,11 @@ const form = ref({
   knowledge_points_input: "",
   difficulty: "normal",
   note: "",
-});
+})
 
-const reviewDialogVisible = ref(false);
-const reviewTarget = ref(null);
-const reviewResult = ref("correct");
+const reviewDialogVisible = ref(false)
+const reviewTarget = ref(null)
+const reviewResult = ref("correct")
 
 const blankForm = () => ({
   subject: "",
@@ -62,11 +61,11 @@ const blankForm = () => ({
   knowledge_points_input: "",
   difficulty: "normal",
   note: "",
-});
+})
 
 const fetchList = async () => {
-  if (!childId.value) return;
-  loading.value = true;
+  if (!childId.value) return
+  loading.value = true
   try {
     const params = {
       child_id: childId.value,
@@ -74,55 +73,55 @@ const fetchList = async () => {
       ...(filters.value.mastery_level && { mastery_level: filters.value.mastery_level }),
       ...(filters.value.status && { status: filters.value.status }),
       ...(filters.value.keyword.trim() && { keyword: filters.value.keyword.trim() }),
-    };
-    items.value = await wrongQuestionsAPI.list(params);
+    }
+    items.value = await wrongQuestionsAPI.list(params)
   } finally {
-    loading.value = false;
+    loading.value = false
   }
-};
+}
 
 const fetchStats = async () => {
-  if (!childId.value) return;
+  if (!childId.value) return
   try {
-    stats.value = await wrongQuestionsAPI.stats(childId.value);
+    stats.value = await wrongQuestionsAPI.stats(childId.value)
   } catch (e) {
-    stats.value = null;
+    stats.value = null
   }
-};
+}
 
 const fetchToday = async () => {
-  if (!childId.value) return;
+  if (!childId.value) return
   try {
-    const data = await wrongQuestionsAPI.today(childId.value);
-    todayCount.value = data?.length || 0;
+    const data = await wrongQuestionsAPI.today(childId.value)
+    todayCount.value = data?.length || 0
   } catch {
-    todayCount.value = 0;
+    todayCount.value = 0
   }
-};
+}
 
 onMounted(async () => {
   if (childId.value) {
-    await Promise.all([fetchList(), fetchStats(), fetchToday()]);
+    await Promise.all([fetchList(), fetchStats(), fetchToday()])
   }
-});
+})
 
 watch(childId, async (id) => {
   if (id) {
-    await Promise.all([fetchList(), fetchStats(), fetchToday()]);
+    await Promise.all([fetchList(), fetchStats(), fetchToday()])
   }
-});
+})
 
 const openCreate = () => {
-  editing.value = null;
-  form.value = blankForm();
+  editing.value = null
+  form.value = blankForm()
   if (childStore.current?.subjects?.length) {
-    form.value.subject = childStore.current.subjects[0];
+    form.value.subject = childStore.current.subjects[0]
   }
-  dialogVisible.value = true;
-};
+  dialogVisible.value = true
+}
 
 const openEdit = (row) => {
-  editing.value = row;
+  editing.value = row
   form.value = {
     subject: row.subject || "",
     question_text: row.question_text || "",
@@ -133,173 +132,182 @@ const openEdit = (row) => {
     knowledge_points_input: (row.knowledge_points || []).join(", "),
     difficulty: row.difficulty || "normal",
     note: row.note || "",
-  };
-  dialogVisible.value = true;
-};
+  }
+  dialogVisible.value = true
+}
 
 const submit = async () => {
   if (!form.value.subject || !form.value.question_text.trim()) {
-    ElMessage.warning("请填写科目和题目内容");
-    return;
+    ElMessage.warning("请填写科目和题目内容")
+    return
   }
   const payload = {
     ...form.value,
     knowledge_points: form.value.knowledge_points_input
-      ? form.value.knowledge_points_input.split(/[,，]/).map((s) => s.trim()).filter(Boolean)
+      ? form.value.knowledge_points_input
+          .split(/[,，]/)
+          .map((s) => s.trim())
+          .filter(Boolean)
       : [],
-  };
-  delete payload.knowledge_points_input;
+  }
+  delete payload.knowledge_points_input
   try {
     if (editing.value) {
-      await wrongQuestionsAPI.update(editing.value.id, payload);
-      ElMessage.success("已更新");
-      dialogVisible.value = false;
-      await fetchList();
-      await fetchStats();
-      await fetchToday();
+      await wrongQuestionsAPI.update(editing.value.id, payload)
+      ElMessage.success("已更新")
+      dialogVisible.value = false
+      await fetchList()
+      await fetchStats()
+      await fetchToday()
     } else {
       const created = await wrongQuestionsAPI.create({
         ...payload,
         child_id: childId.value,
-      });
-      createdId.value = created.id;
+      })
+      createdId.value = created.id
       // 智能匹配：先不关闭 dialog，让用户看到分析结果
-      await analyzeMatch(created.id);
+      await analyzeMatch(created.id)
     }
   } catch (e) {
     // axios interceptor 已提示
   }
-};
+}
 
 // ============ 智能匹配 ============
-const matchSuggestions = ref(null);
-const analyzing = ref(false);
-const createdId = ref(null);
+const matchSuggestions = ref(null)
+const analyzing = ref(false)
+const createdId = ref(null)
 
 const analyzeMatch = async (wqId) => {
-  analyzing.value = true;
+  analyzing.value = true
   try {
-    const data = await wrongQuestionsAPI.match(wqId);
-    matchSuggestions.value = data;
+    const data = await wrongQuestionsAPI.match(wqId)
+    matchSuggestions.value = data
   } catch (e) {
     // 静默失败，不影响主流程
-    matchSuggestions.value = null;
+    matchSuggestions.value = null
   } finally {
-    analyzing.value = false;
+    analyzing.value = false
   }
-};
+}
 
 const applyMatch = async (wqId, suggestion) => {
   try {
     await wrongQuestionsAPI.applyMatch(wqId, {
       bank_question_id: suggestion.question_id,
       knowledge_points: suggestion.knowledge_points ? [suggestion.knowledge_points] : [],
-    });
-    ElMessage.success("已关联题库题目和知识点");
-    matchSuggestions.value = null;
-    dialogVisible.value = false;
-    createdId.value = null;
-    await fetchList();
-    await fetchStats();
+    })
+    ElMessage.success("已关联题库题目和知识点")
+    matchSuggestions.value = null
+    dialogVisible.value = false
+    createdId.value = null
+    await fetchList()
+    await fetchStats()
   } catch (e) {
     // handled
   }
-};
+}
 
 const applyKPMatch = async (wqId, kp) => {
   try {
-    const current = matchSuggestions.value;
-    const kps = current?.kp_matches?.map((m) => m.name) || [];
-    if (!kps.includes(kp.name)) kps.push(kp.name);
-    await wrongQuestionsAPI.applyMatch(wqId, { knowledge_points: kps });
-    ElMessage.success("已补全知识点");
-    matchSuggestions.value = null;
-    dialogVisible.value = false;
-    createdId.value = null;
-    await fetchList();
-    await fetchStats();
+    const current = matchSuggestions.value
+    const kps = current?.kp_matches?.map((m) => m.name) || []
+    if (!kps.includes(kp.name)) kps.push(kp.name)
+    await wrongQuestionsAPI.applyMatch(wqId, { knowledge_points: kps })
+    ElMessage.success("已补全知识点")
+    matchSuggestions.value = null
+    dialogVisible.value = false
+    createdId.value = null
+    await fetchList()
+    await fetchStats()
   } catch (e) {
     // handled
   }
-};
+}
 
 const ignoreMatch = async () => {
-  matchSuggestions.value = null;
-  dialogVisible.value = false;
-  createdId.value = null;
-  await fetchList();
-  await fetchStats();
-  await fetchToday();
-};
+  matchSuggestions.value = null
+  dialogVisible.value = false
+  createdId.value = null
+  await fetchList()
+  await fetchStats()
+  await fetchToday()
+}
 
 const remove = async (row) => {
-  await ElMessageBox.confirm(`确认删除这道错题吗？`, "删除", { type: "warning" });
-  await wrongQuestionsAPI.remove(row.id);
-  ElMessage.success("已删除");
-  await fetchList();
-  await fetchStats();
-  await fetchToday();
-};
+  await ElMessageBox.confirm(`确认删除这道错题吗？`, "删除", { type: "warning" })
+  await wrongQuestionsAPI.remove(row.id)
+  ElMessage.success("已删除")
+  await fetchList()
+  await fetchStats()
+  await fetchToday()
+}
 
 const openReview = (row) => {
-  reviewTarget.value = row;
-  reviewResult.value = "correct";
-  reviewDialogVisible.value = true;
-};
+  reviewTarget.value = row
+  reviewResult.value = "correct"
+  reviewDialogVisible.value = true
+}
 
 const submitReview = async () => {
-  if (!reviewTarget.value) return;
+  if (!reviewTarget.value) return
   try {
-    await wrongQuestionsAPI.review(reviewTarget.value.id, reviewResult.value);
-    ElMessage.success("复习记录已保存");
-    reviewDialogVisible.value = false;
-    reviewTarget.value = null;
-    await fetchList();
-    await fetchStats();
-    await fetchToday();
+    await wrongQuestionsAPI.review(reviewTarget.value.id, reviewResult.value)
+    ElMessage.success("复习记录已保存")
+    reviewDialogVisible.value = false
+    reviewTarget.value = null
+    await fetchList()
+    await fetchStats()
+    await fetchToday()
   } catch (e) {
     // axios interceptor 已提示
   }
-};
+}
 
 const subjectOptions = computed(() => {
-  const set = new Set(["语文", "数学", "英语", "科学", "信息科技", "生物", "地理", "物理"]);
-  (childStore.current?.subjects || []).forEach((s) => set.add(s));
-  return Array.from(set);
-});
+  const set = new Set(["语文", "数学", "英语", "科学", "信息科技", "生物", "地理", "物理"])
+  ;(childStore.current?.subjects || []).forEach((s) => set.add(s))
+  return Array.from(set)
+})
 
 const masteryLabel = (level) => {
-  const map = { new: "新错题", learning: "学习中", mastered: "已掌握" };
-  return map[level] || level;
-};
+  const map = { new: "新错题", learning: "学习中", mastered: "已掌握" }
+  return map[level] || level
+}
 
 const masteryTagType = (level) => {
-  const map = { new: "danger", learning: "warning", mastered: "success" };
-  return map[level] || "info";
-};
+  const map = { new: "danger", learning: "warning", mastered: "success" }
+  return map[level] || "info"
+}
 
 const errorReasonLabel = (reason) => {
-  const map = { careless: "粗心", concept: "概念不清", calculation: "计算错误", reasoning: "推理错误", unfamiliar: "题型陌生" };
-  return map[reason] || reason || "未分类";
-};
+  const map = {
+    careless: "粗心",
+    concept: "概念不清",
+    calculation: "计算错误",
+    reasoning: "推理错误",
+    unfamiliar: "题型陌生",
+  }
+  return map[reason] || reason || "未分类"
+}
 
 const nextReviewLabel = (row) => {
-  if (!row.next_review_date) return "—";
-  const today = new Date();
-  const target = new Date(row.next_review_date);
-  const diff = Math.ceil((target - today) / (1000 * 60 * 60 * 24));
-  if (diff < 0) return `逾期${Math.abs(diff)}天`;
-  if (diff === 0) return "今天";
-  if (diff === 1) return "明天";
-  return `${diff}天后`;
-};
+  if (!row.next_review_date) return "—"
+  const today = new Date()
+  const target = new Date(row.next_review_date)
+  const diff = Math.ceil((target - today) / (1000 * 60 * 60 * 24))
+  if (diff < 0) return `逾期${Math.abs(diff)}天`
+  if (diff === 0) return "今天"
+  if (diff === 1) return "明天"
+  return `${diff}天后`
+}
 
 const goToExercise = async () => {
-  if (!childId.value) return;
+  if (!childId.value) return
   try {
-    const data = await questionBanksAPI.recommend(childId.value);
+    const data = await questionBanksAPI.recommend(childId.value)
     if (data.matched_questions && data.matched_questions.length > 0) {
-      const firstBankId = data.matched_questions[0].bank_id;
+      const firstBankId = data.matched_questions[0].bank_id
       router.push({
         name: "exercise",
         query: {
@@ -307,14 +315,14 @@ const goToExercise = async () => {
           child_id: String(childId.value),
           mode: "recommend",
         },
-      });
+      })
     } else {
-      ElMessage.info(data.suggestion || "暂无匹配的练习题，请先去题库管理添加题目");
+      ElMessage.info(data.suggestion || "暂无匹配的练习题，请先去题库管理添加题目")
     }
   } catch (e) {
     // handled
   }
-};
+}
 </script>
 
 <template>
@@ -324,7 +332,7 @@ const goToExercise = async () => {
         <h2 class="text-lg font-semibold text-slate-800">错题本</h2>
         <p class="text-sm text-slate-500 mt-0.5">记录错题，艾宾浩斯复习提醒，把弱点逐个击破</p>
       </div>
-      <button class="btn-primary" @click="openCreate" :disabled="!childId">+ 录入错题</button>
+      <button class="btn-primary" :disabled="!childId" @click="openCreate">+ 录入错题</button>
     </div>
 
     <!-- 统计卡 -->
@@ -339,7 +347,9 @@ const goToExercise = async () => {
       </div>
       <div class="card p-4">
         <div class="text-xs text-slate-500">掌握率</div>
-        <div class="text-2xl font-bold text-brand-600 mt-1">{{ stats.mastery_rate ? `${stats.mastery_rate}%` : "0%" }}</div>
+        <div class="text-2xl font-bold text-brand-600 mt-1">
+          {{ stats.mastery_rate ? `${stats.mastery_rate}%` : "0%" }}
+        </div>
       </div>
       <div class="card p-4">
         <div class="text-xs text-slate-500">今日待复习</div>
@@ -348,9 +358,7 @@ const goToExercise = async () => {
     </div>
     <!-- 去练习按钮 -->
     <div v-if="childId" class="mb-4">
-      <el-button type="primary" @click="goToExercise" :disabled="!childId">
-        ✏️ 根据错题推荐练习
-      </el-button>
+      <el-button type="primary" :disabled="!childId" @click="goToExercise"> ✏️ 根据错题推荐练习 </el-button>
     </div>
 
     <!-- 筛选 -->
@@ -391,9 +399,13 @@ const goToExercise = async () => {
           <div class="flex-1 min-w-0">
             <div class="flex items-center gap-2 flex-wrap">
               <span class="text-xs font-medium px-2 py-0.5 rounded bg-brand-50 text-brand-700">{{ row.subject }}</span>
-              <el-tag :type="masteryTagType(row.mastery_level)" size="small">{{ masteryLabel(row.mastery_level) }}</el-tag>
+              <el-tag :type="masteryTagType(row.mastery_level)" size="small">{{
+                masteryLabel(row.mastery_level)
+              }}</el-tag>
               <span class="text-xs text-slate-500">{{ errorReasonLabel(row.error_reason) }}</span>
-              <span class="text-xs text-slate-400">复习{{ row.review_count || 0 }}次 · 错{{ row.wrong_count || 0 }}次</span>
+              <span class="text-xs text-slate-400"
+                >复习{{ row.review_count || 0 }}次 · 错{{ row.wrong_count || 0 }}次</span
+              >
             </div>
             <div class="mt-2 text-sm text-slate-800 line-clamp-2">{{ row.question_text }}</div>
             <div class="mt-2 text-xs text-slate-500">
@@ -402,11 +414,14 @@ const goToExercise = async () => {
               <span class="text-slate-400">正确答案：</span>{{ row.correct_answer }}
             </div>
             <div class="mt-2 flex flex-wrap gap-1">
-              <span v-for="kp in (row.knowledge_points || [])" :key="kp" class="text-[10px] px-1.5 py-0.5 rounded bg-slate-100 text-slate-600">{{ kp }}</span>
+              <span
+                v-for="kp in row.knowledge_points || []"
+                :key="kp"
+                class="text-[10px] px-1.5 py-0.5 rounded bg-slate-100 text-slate-600"
+                >{{ kp }}</span
+              >
             </div>
-            <div class="mt-1.5 text-xs text-slate-400">
-              下次复习：{{ nextReviewLabel(row) }}
-            </div>
+            <div class="mt-1.5 text-xs text-slate-400">下次复习：{{ nextReviewLabel(row) }}</div>
           </div>
           <div class="flex flex-col gap-1.5 flex-shrink-0">
             <button class="text-xs text-brand-600 hover:text-brand-700" @click="openReview(row)">复习</button>
@@ -464,7 +479,10 @@ const goToExercise = async () => {
         </el-form-item>
       </el-form>
       <!-- 智能分析卡片 -->
-      <div v-if="matchSuggestions && !editing" class="mt-4 p-4 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg border border-blue-200">
+      <div
+        v-if="matchSuggestions && !editing"
+        class="mt-4 p-4 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg border border-blue-200"
+      >
         <div class="flex items-center gap-2 mb-3">
           <span class="text-lg">🧠</span>
           <span class="font-semibold text-slate-800">智能分析</span>
@@ -475,16 +493,30 @@ const goToExercise = async () => {
         <!-- 题库匹配 -->
         <div v-if="matchSuggestions.bank_matches && matchSuggestions.bank_matches.length" class="mb-3">
           <div class="text-xs text-slate-500 mb-1">🔗 可能来自题库：</div>
-          <div v-for="m in matchSuggestions.bank_matches" :key="m.question_id" class="flex items-start justify-between gap-2 p-2 bg-white rounded border border-slate-200 mb-1.5">
+          <div
+            v-for="m in matchSuggestions.bank_matches"
+            :key="m.question_id"
+            class="flex items-start justify-between gap-2 p-2 bg-white rounded border border-slate-200 mb-1.5"
+          >
             <div class="flex-1 min-w-0">
               <div class="text-xs font-medium text-slate-800 truncate">{{ m.bank_title }}</div>
               <div class="text-[10px] text-slate-500 mt-0.5 line-clamp-1">{{ m.content }}</div>
               <div class="flex gap-1 mt-1 flex-wrap">
-                <span v-for="reason in m.match_reasons" :key="reason" class="text-[10px] px-1 rounded bg-blue-100 text-blue-700">{{ reason }}</span>
-                <span class="text-[10px] px-1 rounded bg-slate-100 text-slate-600">相似度 {{ Math.round(m.score * 100) }}%</span>
+                <span
+                  v-for="reason in m.match_reasons"
+                  :key="reason"
+                  class="text-[10px] px-1 rounded bg-blue-100 text-blue-700"
+                  >{{ reason }}</span
+                >
+                <span class="text-[10px] px-1 rounded bg-slate-100 text-slate-600"
+                  >相似度 {{ Math.round(m.score * 100) }}%</span
+                >
               </div>
             </div>
-            <button class="text-xs text-brand-600 hover:text-brand-700 whitespace-nowrap" @click="applyMatch(createdId.value, m)">
+            <button
+              class="text-xs text-brand-600 hover:text-brand-700 whitespace-nowrap"
+              @click="applyMatch(createdId.value, m)"
+            >
               采纳
             </button>
           </div>
@@ -494,7 +526,11 @@ const goToExercise = async () => {
         <div v-if="matchSuggestions.kp_matches && matchSuggestions.kp_matches.length" class="mb-3">
           <div class="text-xs text-slate-500 mb-1">💡 推测知识点（新 KP 体系）：</div>
           <div class="flex flex-wrap gap-1">
-            <span v-for="m in matchSuggestions.kp_matches" :key="m.knowledge_point_id" class="text-xs px-2 py-0.5 rounded bg-indigo-100 text-indigo-700 flex items-center gap-1">
+            <span
+              v-for="m in matchSuggestions.kp_matches"
+              :key="m.knowledge_point_id"
+              class="text-xs px-2 py-0.5 rounded bg-indigo-100 text-indigo-700 flex items-center gap-1"
+            >
               {{ m.name }}
               <span v-if="m.unit_code" class="text-[10px] text-indigo-400">·{{ m.unit_code }}</span>
               <span class="text-[10px] text-indigo-500">({{ Math.round(m.score * 100) }}%)</span>
@@ -503,7 +539,10 @@ const goToExercise = async () => {
           </div>
         </div>
 
-        <div v-if="!matchSuggestions.bank_matches?.length && !matchSuggestions.kp_matches?.length" class="text-xs text-slate-500">
+        <div
+          v-if="!matchSuggestions.bank_matches?.length && !matchSuggestions.kp_matches?.length"
+          class="text-xs text-slate-500"
+        >
           暂无匹配建议，系统会持续学习优化
         </div>
 

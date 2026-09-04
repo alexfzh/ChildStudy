@@ -1,67 +1,65 @@
 <script setup>
-import { ref, computed, onMounted } from "vue";
-import { useRouter } from "vue-router";
-import { useAuthStore } from "@/stores/auth";
-import { rewardsAPI, wrongQuestionsAPI, dashboardAPI, questionBanksAPI, quoteAPI } from "@/api";
-import dayjs from "dayjs";
-import TrendLineChart from "@/components/charts/TrendLineChart.vue";
-import RadarChart from "@/components/charts/RadarChart.vue";
+import { ref, computed, onMounted } from "vue"
+import { useAuthStore } from "@/stores/auth"
+import { rewardsAPI, wrongQuestionsAPI, dashboardAPI, questionBanksAPI, quoteAPI } from "@/api"
+import dayjs from "dayjs"
+import TrendLineChart from "@/components/charts/TrendLineChart.vue"
+import RadarChart from "@/components/charts/RadarChart.vue"
 
-const auth = useAuthStore();
-const router = useRouter();
+const auth = useAuthStore()
 
-const childId = computed(() => auth.currentChildId);
-const displayName = computed(() => auth.user?.display_name || "同学");
+const childId = computed(() => auth.currentChildId)
+const displayName = computed(() => auth.user?.display_name || "同学")
 
-const loading = ref(true);
-const points = ref({ earned: 0, spent: 0 });
-const achievementCount = ref(0);
-const wrongStats = ref({ total: 0, active: 0, mastered: 0 });
-const dashboard = ref(null);
+const loading = ref(true)
+const points = ref({ earned: 0, spent: 0 })
+const achievementCount = ref(0)
+const wrongStats = ref({ total: 0, active: 0, mastered: 0 })
+const dashboard = ref(null)
 // 练习汇总（v1.8.0）
-const recentExercises = ref([]);
+const recentExercises = ref([])
 
 // 随机诗词 / 名言（欢迎栏展示，点击可换一条）
-const quote = ref(null);
-const quoteLoading = ref(false);
+const quote = ref(null)
+const quoteLoading = ref(false)
 
 async function loadQuote() {
-  if (quoteLoading.value) return;
-  quoteLoading.value = true;
+  if (quoteLoading.value) return
+  quoteLoading.value = true
   try {
-    quote.value = await quoteAPI.random();
+    quote.value = await quoteAPI.random()
   } catch (e) {
     // 接口异常时静默，卡片不显示即可
   } finally {
-    quoteLoading.value = false;
+    quoteLoading.value = false
   }
 }
 
-const availablePoints = computed(() => (points.value.earned || 0) - (points.value.spent || 0));
+const availablePoints = computed(() => (points.value.earned || 0) - (points.value.spent || 0))
 
 // 练习汇总：总次数 / 最近一次 / 完美率（>=80%）
 const practiceStats = computed(() => {
-  const list = (recentExercises.value || []).filter((e) => e.submitted_at);
-  const total = list.length;
-  const last = list[0];
-  const perfect = list.filter((e) => (e.score ?? 0) >= 80).length;
-  const perfectRate = total > 0 ? Math.round((perfect / total) * 100) : 0;
-  return { total, last, perfectRate };
-});
+  const list = (recentExercises.value || []).filter((e) => e.submitted_at)
+  const total = list.length
+  const last = list[0]
+  const perfect = list.filter((e) => (e.score ?? 0) >= 80).length
+  const perfectRate = total > 0 ? Math.round((perfect / total) * 100) : 0
+  return { total, last, perfectRate }
+})
 
-const scoreColor = (s) => (s >= 80 ? "text-emerald-600" : s >= 60 ? "text-amber-600" : "text-rose-500");
+const scoreColor = (s) => (s >= 80 ? "text-emerald-600" : s >= 60 ? "text-amber-600" : "text-rose-500")
 
 // 成绩曲线（家长看板 dashboardAPI.get 返回的 trend_data）
 const trendChartProps = computed(() => ({
   dates: dashboard.value?.trend_data?.dates || [],
   series: dashboard.value?.trend_data?.series || [],
-}));
+}))
 
 // 五边形能力图（radar_data）
 const radarProps = computed(() => ({
   indicators: dashboard.value?.radar_data?.indicators || [],
   values: dashboard.value?.radar_data?.values || [],
-}));
+}))
 
 const quickLinks = [
   { name: "wrong-questions", path: "/wrong-questions", label: "错题本", icon: "📙", desc: "复习我的错题" },
@@ -70,11 +68,11 @@ const quickLinks = [
   { name: "study-progress", path: "/study-progress", label: "教材学习进度", icon: "📚", desc: "学到第几课啦" },
   { name: "project-works", path: "/project-works", label: "单元 Big Task", icon: "🎨", desc: "我的作品集" },
   { name: "question-banks", path: "/question-banks", label: "题库练习", icon: "✏️", desc: "来做几道题" },
-];
+]
 
 async function load() {
-  if (!childId.value) return;
-  loading.value = true;
+  if (!childId.value) return
+  loading.value = true
   try {
     const [p, ach, ws, dash, exs] = await Promise.all([
       rewardsAPI.points(childId.value),
@@ -82,29 +80,29 @@ async function load() {
       wrongQuestionsAPI.stats(childId.value),
       dashboardAPI.get(childId.value),
       questionBanksAPI.listExercises(childId.value).catch(() => []),
-    ]);
-    points.value = p || { earned: 0, spent: 0 };
-    achievementCount.value = Array.isArray(ach) ? ach.length : 0;
-    wrongStats.value = ws || { total: 0, active: 0, mastered: 0 };
-    dashboard.value = dash || null;
-    recentExercises.value = Array.isArray(exs) ? exs : [];
+    ])
+    points.value = p || { earned: 0, spent: 0 }
+    achievementCount.value = Array.isArray(ach) ? ach.length : 0
+    wrongStats.value = ws || { total: 0, active: 0, mastered: 0 }
+    dashboard.value = dash || null
+    recentExercises.value = Array.isArray(exs) ? exs : []
   } catch (e) {
     // 静默失败，模板已做防御渲染
   } finally {
-    loading.value = false;
+    loading.value = false
   }
 }
 
 onMounted(() => {
-  load();
-  loadQuote();
-});
+  load()
+  loadQuote()
+})
 
 function formatDuration(seconds) {
-  const m = Math.floor(seconds / 60);
-  const s = seconds % 60;
-  if (m === 0) return `${s} 秒`;
-  return `${m} 分 ${s.toString().padStart(2, "0")} 秒`;
+  const m = Math.floor(seconds / 60)
+  const s = seconds % 60
+  if (m === 0) return `${s} 秒`
+  return `${m} 分 ${s.toString().padStart(2, "0")} 秒`
 }
 </script>
 
@@ -130,18 +128,16 @@ function formatDuration(seconds) {
           <div class="flex items-start gap-2">
             <span class="quote-mark text-xl leading-none select-none opacity-60">「</span>
             <div class="min-w-0 flex-1">
-              <p
-                class="text-[13px] leading-relaxed font-medium"
-                :class="{ 'opacity-60': quoteLoading }"
-              >{{ quote.content }}</p>
+              <p class="text-[13px] leading-relaxed font-medium" :class="{ 'opacity-60': quoteLoading }">
+                {{ quote.content }}
+              </p>
               <p class="text-[11px] opacity-75 mt-1">
                 —— {{ quote.author }}<template v-if="quote.source"> · {{ quote.source }}</template>
               </p>
             </div>
-            <span
-              class="text-sm opacity-60 select-none shrink-0 mt-0.5"
-              :class="{ 'animate-spin': quoteLoading }"
-            >⟳</span>
+            <span class="text-sm opacity-60 select-none shrink-0 mt-0.5" :class="{ 'animate-spin': quoteLoading }"
+              >⟳</span
+            >
           </div>
         </button>
       </div>
@@ -149,10 +145,7 @@ function formatDuration(seconds) {
 
     <!-- 统计卡片（可点击跳转，适配触摸屏） -->
     <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
-      <router-link
-        to="/rewards"
-        class="stat-card group"
-      >
+      <router-link to="/rewards" class="stat-card group">
         <div class="flex items-center justify-between">
           <div class="text-xs text-slate-400">可用积分</div>
           <span class="text-slate-300 group-hover:text-amber-400 transition-colors text-sm">→</span>
@@ -162,10 +155,7 @@ function formatDuration(seconds) {
         </div>
         <div class="text-[11px] text-slate-400 mt-1">累计获得 {{ points.earned || 0 }} · 去商城逛逛</div>
       </router-link>
-      <router-link
-        to="/achievements"
-        class="stat-card group"
-      >
+      <router-link to="/achievements" class="stat-card group">
         <div class="flex items-center justify-between">
           <div class="text-xs text-slate-400">我的成就</div>
           <span class="text-slate-300 group-hover:text-brand-500 transition-colors text-sm">→</span>
@@ -175,16 +165,13 @@ function formatDuration(seconds) {
         </div>
         <div class="text-[11px] text-slate-400 mt-1">枚勋章已点亮 · 看看成就墙</div>
       </router-link>
-      <router-link
-        to="/wrong-questions"
-        class="stat-card group"
-      >
+      <router-link to="/wrong-questions" class="stat-card group">
         <div class="flex items-center justify-between">
           <div class="text-xs text-slate-400">待复习错题</div>
           <span class="text-slate-300 group-hover:text-rose-400 transition-colors text-sm">→</span>
         </div>
         <div class="text-2xl font-bold text-rose-500 mt-1">
-          {{ loading ? "…" : (wrongStats.active || 0) }}
+          {{ loading ? "…" : wrongStats.active || 0 }}
         </div>
         <div class="text-[11px] text-slate-400 mt-1">共 {{ wrongStats.total || 0 }} 道 · 去复习</div>
       </router-link>
@@ -194,7 +181,9 @@ function formatDuration(seconds) {
     <div v-if="practiceStats.total > 0" class="bg-white rounded-xl border border-slate-200 p-5 shadow-sm">
       <div class="flex items-center justify-between mb-3 flex-wrap gap-2">
         <h3 class="font-semibold text-slate-800 flex items-center gap-2">✏️ 我的练习</h3>
-        <router-link to="/question-banks" class="text-xs text-brand-600 hover:text-brand-700 hover:underline">去练习 →</router-link>
+        <router-link to="/question-banks" class="text-xs text-brand-600 hover:text-brand-700 hover:underline"
+          >去练习 →</router-link
+        >
       </div>
 
       <!-- 顶部三联卡：总次数 / 最近得分 / 优秀率 -->
@@ -209,7 +198,7 @@ function formatDuration(seconds) {
           <div class="text-2xl font-bold mt-1" :class="scoreColor(practiceStats.last?.score || 0)">
             {{ practiceStats.last?.score?.toFixed?.(1) ?? practiceStats.last?.score ?? 0 }}
           </div>
-          <div class="text-[10px] text-slate-400 mt-1 truncate">{{ practiceStats.last?.bank_title || '—' }}</div>
+          <div class="text-[10px] text-slate-400 mt-1 truncate">{{ practiceStats.last?.bank_title || "—" }}</div>
         </div>
         <div class="bg-emerald-50 rounded-lg p-3.5">
           <div class="text-xs text-emerald-700">优秀率 (≥80%)</div>
@@ -229,7 +218,12 @@ function formatDuration(seconds) {
           <div class="min-w-0 flex-1">
             <div class="text-sm font-medium text-slate-700 truncate">{{ e.bank_title || `题库 #${e.bank_id}` }}</div>
             <div class="text-xs text-slate-400 mt-0.5">
-              {{ dayjs.utc(e.submitted_at || e.created_at).tz("Asia/Shanghai").format("MM-DD HH:mm:ss") }}
+              {{
+                dayjs
+                  .utc(e.submitted_at || e.created_at)
+                  .tz("Asia/Shanghai")
+                  .format("MM-DD HH:mm:ss")
+              }}
               <span class="mx-1">·</span>
               答对 {{ e.correct_count }}/{{ e.total_questions }}
               <span v-if="e.time_spent" class="mx-1">·</span>
@@ -247,25 +241,15 @@ function formatDuration(seconds) {
     <div class="grid grid-cols-1 lg:grid-cols-3 gap-5">
       <div class="bg-white rounded-xl border border-slate-200 p-5 shadow-sm lg:col-span-2">
         <h3 class="font-semibold text-slate-800 mb-3">📈 成绩趋势</h3>
-        <TrendLineChart
-          v-if="trendChartProps.dates.length"
-          v-bind="trendChartProps"
-          height="300px"
-        />
+        <TrendLineChart v-if="trendChartProps.dates.length" v-bind="trendChartProps" height="300px" />
         <div v-else class="h-64 flex items-center justify-center text-slate-400 text-sm">
           还没有考试数据，去练习一下吧
         </div>
       </div>
       <div class="bg-white rounded-xl border border-slate-200 p-5 shadow-sm">
         <h3 class="font-semibold text-slate-800 mb-3">🕸️ 能力分布</h3>
-        <RadarChart
-          v-if="radarProps.indicators.length"
-          v-bind="radarProps"
-          title="能力分布"
-        />
-        <div v-else class="h-64 flex items-center justify-center text-slate-400 text-sm">
-          录入成绩后查看
-        </div>
+        <RadarChart v-if="radarProps.indicators.length" v-bind="radarProps" title="能力分布" />
+        <div v-else class="h-64 flex items-center justify-center text-slate-400 text-sm">录入成绩后查看</div>
       </div>
     </div>
 
@@ -303,7 +287,10 @@ function formatDuration(seconds) {
   user-select: none;
   -webkit-tap-highlight-color: transparent; /* 去掉 pad 上的蓝色点按高亮 */
   touch-action: manipulation; /* 消除移动端 300ms 点击延迟 */
-  transition: transform 0.12s ease, box-shadow 0.15s ease, border-color 0.15s ease;
+  transition:
+    transform 0.12s ease,
+    box-shadow 0.15s ease,
+    border-color 0.15s ease;
 }
 .stat-card:hover {
   border-color: #c7d2fe;

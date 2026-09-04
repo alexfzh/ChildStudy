@@ -1,16 +1,16 @@
 <script setup>
-import { ref, computed, onMounted, watch } from "vue";
-import { ElMessage, ElMessageBox } from "element-plus";
-import dayjs from "dayjs";
-import { useChildStore } from "@/stores/child";
-import { homeworksAPI, importExportAPI } from "@/api";
-import { PRESET_SUBJECTS } from "@/constants/subjects";
+import { ref, computed, onMounted, watch } from "vue"
+import { ElMessage, ElMessageBox } from "element-plus"
+import dayjs from "dayjs"
+import { useChildStore } from "@/stores/child"
+import { homeworksAPI, importExportAPI } from "@/api"
+import { PRESET_SUBJECTS } from "@/constants/subjects"
 
-const childStore = useChildStore();
+const childStore = useChildStore()
 
-const loading = ref(false);
-const homeworks = ref([]);
-const filterSubject = ref("");
+const loading = ref(false)
+const homeworks = ref([])
+const filterSubject = ref("")
 
 const blank = () => ({
   child_id: childStore.currentId,
@@ -24,142 +24,149 @@ const blank = () => ({
   completed: true,
   difficulty: "normal",
   note: "",
-});
+})
 
-const form = ref(blank());
-const dialogVisible = ref(false);
-const editing = ref(null);
+const form = ref(blank())
+const dialogVisible = ref(false)
+const editing = ref(null)
 
 // ============ 行内编辑 ============
-const editingCell = ref(null); // { rowId: number, field: string } | null
+const editingCell = ref(null) // { rowId: number, field: string } | null
 
 const isEditing = (row, field) => editingCell.value?.rowId === row.id && editingCell.value?.field === field
 
 const startEdit = (row, field) => {
-  editingCell.value = { rowId: row.id, field };
-};
+  editingCell.value = { rowId: row.id, field }
+}
 const saveEdit = async (row, field, value) => {
-  const prev = editingCell.value;
-  editingCell.value = null;
+  const prev = editingCell.value
+  editingCell.value = null
   try {
-    await homeworksAPI.update(row.id, { [field]: value });
-    Object.assign(row, { [field]: value });
-    ElMessage.success("已更新");
+    await homeworksAPI.update(row.id, { [field]: value })
+    Object.assign(row, { [field]: value })
+    ElMessage.success("已更新")
   } catch {
-    editingCell.value = prev;
+    editingCell.value = prev
   }
-};
-const cancelEdit = () => {
-  editingCell.value = null;
-};
+}
 
 const fetchList = async () => {
-  if (!childStore.currentId) return;
-  loading.value = true;
+  if (!childStore.currentId) return
+  loading.value = true
   try {
     homeworks.value = await homeworksAPI.list({
       child_id: childStore.currentId,
       subject: filterSubject.value || undefined,
-    });
+    })
   } finally {
-    loading.value = false;
+    loading.value = false
   }
-};
+}
 
-onMounted(fetchList);
-watch(() => childStore.currentId, fetchList);
-watch(filterSubject, fetchList);
+onMounted(fetchList)
+watch(() => childStore.currentId, fetchList)
+watch(filterSubject, fetchList)
 
 const openCreate = () => {
-  editing.value = null;
-  form.value = blank();
-  dialogVisible.value = true;
-};
+  editing.value = null
+  form.value = blank()
+  dialogVisible.value = true
+}
 const openEdit = (h) => {
-  editing.value = h;
-  form.value = { ...blank(), ...h };
-  dialogVisible.value = true;
-};
+  editing.value = h
+  form.value = { ...blank(), ...h }
+  dialogVisible.value = true
+}
 
 const submit = async () => {
   if (!form.value.subject || !form.value.title) {
-    ElMessage.warning("请填写科目和作业标题");
-    return;
+    ElMessage.warning("请填写科目和作业标题")
+    return
   }
   if (editing.value) {
-    await homeworksAPI.update(editing.value.id, form.value);
-    ElMessage.success("已更新");
+    await homeworksAPI.update(editing.value.id, form.value)
+    ElMessage.success("已更新")
   } else {
-    await homeworksAPI.create(form.value);
-    ElMessage.success("已录入");
+    await homeworksAPI.create(form.value)
+    ElMessage.success("已录入")
   }
-  dialogVisible.value = false;
-  await fetchList();
-};
+  dialogVisible.value = false
+  await fetchList()
+}
 
 const remove = async (h) => {
-  await ElMessageBox.confirm(`确认删除「${h.title}」吗？`, "删除", { type: "warning" });
-  await homeworksAPI.remove(h.id);
-  ElMessage.success("已删除");
-  await fetchList();
-};
+  await ElMessageBox.confirm(`确认删除「${h.title}」吗？`, "删除", { type: "warning" })
+  await homeworksAPI.remove(h.id)
+  ElMessage.success("已删除")
+  await fetchList()
+}
 
 const subjectOptions = computed(() => {
-  const set = new Set(PRESET_SUBJECTS);
-  (childStore.current?.subjects || []).forEach((s) => set.add(s));
-  homeworks.value.forEach((h) => set.add(h.subject));
-  return Array.from(set).sort();
-});
+  const set = new Set(PRESET_SUBJECTS)
+  ;(childStore.current?.subjects || []).forEach((s) => set.add(s))
+  homeworks.value.forEach((h) => set.add(h.subject))
+  return Array.from(set).sort()
+})
 
-const accColor = (a) => a == null ? "text-slate-400" : a >= 90 ? "text-emerald-600" : a >= 75 ? "text-brand-600" : a >= 60 ? "text-amber-600" : "text-rose-600";
+const accColor = (a) =>
+  a == null
+    ? "text-slate-400"
+    : a >= 90
+      ? "text-emerald-600"
+      : a >= 75
+        ? "text-brand-600"
+        : a >= 60
+          ? "text-amber-600"
+          : "text-rose-600"
 
-const difficultyLabel = (d) => ({ easy: "简单", normal: "中等", hard: "困难" })[d] || d;
-const difficultyBadge = (d) => d === "easy" ? "badge-info" : d === "hard" ? "badge-down" : "badge-flat";
+const difficultyLabel = (d) => ({ easy: "简单", normal: "中等", hard: "困难" })[d] || d
+const difficultyBadge = (d) => (d === "easy" ? "badge-info" : d === "hard" ? "badge-down" : "badge-flat")
 
 // ============ 导入导出 ============
-const importDialogVisible = ref(false);
-const importFile = ref(null);
-const importLoading = ref(false);
+const importDialogVisible = ref(false)
+const importFile = ref(null)
+const importLoading = ref(false)
 
 const doExport = async () => {
   try {
     const blob = await importExportAPI.exportHomeworks({
       child_id: childStore.currentId,
       subject: filterSubject.value || undefined,
-    });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `homeworks_${childStore.current?.name || "all"}_${dayjs().format("YYYYMMDD")}.csv`;
-    a.click();
-    URL.revokeObjectURL(url);
-    ElMessage.success("导出成功");
-  } catch (e) { /* axios 已提示 */ }
-};
+    })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement("a")
+    a.href = url
+    a.download = `homeworks_${childStore.current?.name || "all"}_${dayjs().format("YYYYMMDD")}.csv`
+    a.click()
+    URL.revokeObjectURL(url)
+    ElMessage.success("导出成功")
+  } catch (e) {
+    /* axios 已提示 */
+  }
+}
 
 const doImport = async () => {
   if (!importFile.value) {
-    ElMessage.warning("请选择 CSV 文件");
-    return;
+    ElMessage.warning("请选择 CSV 文件")
+    return
   }
-  importLoading.value = true;
+  importLoading.value = true
   try {
-    const res = await importExportAPI.importHomeworks(importFile.value, childStore.currentId);
-    ElMessage.success(res.message || "导入完成");
-    importDialogVisible.value = false;
-    importFile.value = null;
-    await fetchList();
-  } catch (e) { /* axios 已提示 */ }
-  finally {
-    importLoading.value = false;
+    const res = await importExportAPI.importHomeworks(importFile.value, childStore.currentId)
+    ElMessage.success(res.message || "导入完成")
+    importDialogVisible.value = false
+    importFile.value = null
+    await fetchList()
+  } catch (e) {
+    /* axios 已提示 */
+  } finally {
+    importLoading.value = false
   }
-};
+}
 </script>
 
 <template>
-  <div v-if="!childStore.currentId" class="card p-10 text-center text-slate-500">
-    请先在「孩子档案」中添加孩子
-  </div>
+  <div v-if="!childStore.currentId" class="card p-10 text-center text-slate-500">请先在「孩子档案」中添加孩子</div>
 
   <div v-else>
     <div class="flex items-center justify-between mb-4 flex-wrap gap-2">
@@ -190,7 +197,7 @@ const doImport = async () => {
       <el-table :data="homeworks" style="width: 100%">
         <el-table-column prop="homework_date" label="日期" width="120" sortable>
           <template #default="scope">
-            {{ dayjs(scope.row.homework_date).format('MM-DD') }}
+            {{ dayjs(scope.row.homework_date).format("MM-DD") }}
           </template>
         </el-table-column>
         <el-table-column prop="subject" label="科目" width="100" sortable>
@@ -209,7 +216,8 @@ const doImport = async () => {
               v-else
               class="badge bg-slate-100 text-slate-600 cursor-pointer hover:opacity-70"
               @dblclick="startEdit(scope.row, 'subject')"
-            >{{ scope.row.subject }}</span>
+              >{{ scope.row.subject }}</span
+            >
           </template>
         </el-table-column>
         <el-table-column prop="title" label="标题" min-width="180" show-overflow-tooltip sortable>
@@ -221,11 +229,9 @@ const doImport = async () => {
               @blur="saveEdit(scope.row, 'title', scope.row.title)"
               @keyup.enter="$event.target.blur()"
             />
-            <span
-              v-else
-              class="cursor-pointer hover:text-brand-600"
-              @dblclick="startEdit(scope.row, 'title')"
-            >{{ scope.row.title }}</span>
+            <span v-else class="cursor-pointer hover:text-brand-600" @dblclick="startEdit(scope.row, 'title')">{{
+              scope.row.title
+            }}</span>
           </template>
         </el-table-column>
         <el-table-column prop="accuracy" label="正确率" width="110" align="center" sortable>
@@ -246,7 +252,7 @@ const doImport = async () => {
               :class="['cursor-pointer', accColor(scope.row.accuracy)]"
               @dblclick="startEdit(scope.row, 'accuracy')"
             >
-              {{ scope.row.accuracy != null ? scope.row.accuracy + '%' : '—' }}
+              {{ scope.row.accuracy != null ? scope.row.accuracy + "%" : "—" }}
             </span>
           </template>
         </el-table-column>
@@ -266,7 +272,7 @@ const doImport = async () => {
               class="cursor-pointer hover:text-brand-600"
               @dblclick="startEdit(scope.row, 'total_questions')"
             >
-              {{ scope.row.total_questions ?? '—' }}
+              {{ scope.row.total_questions ?? "—" }}
             </span>
           </template>
         </el-table-column>
@@ -289,7 +295,8 @@ const doImport = async () => {
               class="cursor-pointer"
               :class="difficultyBadge(scope.row.difficulty)"
               @dblclick="startEdit(scope.row, 'difficulty')"
-            >{{ difficultyLabel(scope.row.difficulty) }}</span>
+              >{{ difficultyLabel(scope.row.difficulty) }}</span
+            >
           </template>
         </el-table-column>
         <el-table-column prop="completed" label="完成" width="80" align="center" sortable>
@@ -310,7 +317,8 @@ const doImport = async () => {
               class="cursor-pointer"
               :class="scope.row.completed ? 'text-emerald-600' : 'text-amber-600'"
               @dblclick="startEdit(scope.row, 'completed')"
-            >{{ scope.row.completed ? '✓' : '○' }}</span>
+              >{{ scope.row.completed ? "✓" : "○" }}</span
+            >
           </template>
         </el-table-column>
         <el-table-column label="操作" width="120" fixed="right" align="center">
@@ -374,12 +382,13 @@ const doImport = async () => {
     <el-dialog v-model="importDialogVisible" title="导入作业 CSV" width="480px">
       <div class="space-y-3">
         <div class="text-sm text-slate-600">
-          当前孩子：<span class="font-medium">{{ childStore.current?.name }}</span>（{{ childStore.current?.grade }}）
+          当前孩子：<span class="font-medium">{{ childStore.current?.name }}</span
+          >（{{ childStore.current?.grade }}）
         </div>
         <el-alert title="CSV 必须包含列：subject, title, homework_date" type="info" :closable="false" />
         <el-form label-position="top">
           <el-form-item label="选择 CSV 文件">
-            <input type="file" accept=".csv" @change="(e) => importFile.value = e.target.files[0]" />
+            <input type="file" accept=".csv" @change="(e) => (importFile.value = e.target.files[0])" />
           </el-form-item>
         </el-form>
         <div class="text-xs text-slate-400">

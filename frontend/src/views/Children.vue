@@ -1,26 +1,26 @@
 <script setup>
-import { ref, computed, onMounted } from "vue";
-import { ElMessage, ElMessageBox } from "element-plus";
-import dayjs from "dayjs";
-import { useChildStore } from "@/stores/child";
-import { dashboardAPI } from "@/api";
-import SubjectPicker from "@/components/SubjectPicker.vue";
+import { ref, onMounted } from "vue"
+import { ElMessage, ElMessageBox } from "element-plus"
+import dayjs from "dayjs"
+import { useChildStore } from "@/stores/child"
+import { dashboardAPI } from "@/api"
+import SubjectPicker from "@/components/SubjectPicker.vue"
 
-const childStore = useChildStore();
+const childStore = useChildStore()
 
 // 多孩子对比数据（多孩子家庭展示各自的优势与需关注领域）
-const compareData = ref(null);
+const compareData = ref(null)
 const loadCompare = async () => {
   try {
-    compareData.value = await dashboardAPI.compare();
+    compareData.value = await dashboardAPI.compare()
   } catch (e) {
     /* noop */
   }
-};
-onMounted(loadCompare);
+}
+onMounted(loadCompare)
 
-const dialogVisible = ref(false);
-const editing = ref(null);
+const dialogVisible = ref(false)
+const editing = ref(null)
 
 const blank = () => ({
   name: "",
@@ -31,88 +31,92 @@ const blank = () => ({
   gender: null,
   notes: "",
   subjects: ["语文", "数学", "英语"],
-});
+})
 
-const form = ref(blank());
+const form = ref(blank())
 
 // 升年级弹窗
-const promoteDialogVisible = ref(false);
-const promoteForm = ref({ grade: "", effective_from: dayjs().format("YYYY-MM-DD"), note: "" });
-const promotingChild = ref(null);
+const promoteDialogVisible = ref(false)
+const promoteForm = ref({ grade: "", effective_from: dayjs().format("YYYY-MM-DD"), note: "" })
+const promotingChild = ref(null)
 
 // 历史展开状态
-const expandedHistory = ref(new Set());
+const expandedHistory = ref(new Set())
 
 const openCreate = () => {
-  editing.value = null;
-  form.value = blank();
-  dialogVisible.value = true;
-};
+  editing.value = null
+  form.value = blank()
+  dialogVisible.value = true
+}
 
 const openEdit = (child) => {
-  editing.value = child;
-  form.value = { ...blank(), ...child, subjects: [...(child.subjects || [])] };
-  dialogVisible.value = true;
-};
+  editing.value = child
+  form.value = { ...blank(), ...child, subjects: [...(child.subjects || [])] }
+  dialogVisible.value = true
+}
 
 const submit = async () => {
   if (!form.value.name || !form.value.grade) {
-    ElMessage.warning("请填写姓名和年级");
-    return;
+    ElMessage.warning("请填写姓名和年级")
+    return
   }
   try {
     if (editing.value) {
-      await childStore.update(editing.value.id, form.value);
-      ElMessage.success("已保存");
+      await childStore.update(editing.value.id, form.value)
+      ElMessage.success("已保存")
     } else {
-      await childStore.create(form.value);
-      ElMessage.success("已添加孩子档案");
+      await childStore.create(form.value)
+      ElMessage.success("已添加孩子档案")
     }
-    dialogVisible.value = false;
-  } catch (e) { /* axios 已提示 */ }
-};
+    dialogVisible.value = false
+  } catch (e) {
+    /* axios 已提示 */
+  }
+}
 
 const remove = async (child) => {
-  await ElMessageBox.confirm(
-    `确认删除「${child.name}」及其所有数据吗？此操作不可恢复。`,
-    "删除确认",
-    { type: "warning", confirmButtonText: "删除", cancelButtonText: "取消" }
-  );
-  await childStore.remove(child.id);
-  ElMessage.success("已删除");
-};
+  await ElMessageBox.confirm(`确认删除「${child.name}」及其所有数据吗？此操作不可恢复。`, "删除确认", {
+    type: "warning",
+    confirmButtonText: "删除",
+    cancelButtonText: "取消",
+  })
+  await childStore.remove(child.id)
+  ElMessage.success("已删除")
+}
 
 // 升年级
 const openPromote = (child) => {
-  promotingChild.value = child;
+  promotingChild.value = child
   promoteForm.value = {
     grade: "",
     effective_from: dayjs().format("YYYY-MM-DD"),
     note: "",
-  };
-  promoteDialogVisible.value = true;
-};
+  }
+  promoteDialogVisible.value = true
+}
 
 const submitPromote = async () => {
-  const f = promoteForm.value;
+  const f = promoteForm.value
   if (!f.grade.trim()) {
-    ElMessage.warning("请填写新年级");
-    return;
+    ElMessage.warning("请填写新年级")
+    return
   }
   if (!f.effective_from) {
-    ElMessage.warning("请选择生效日期");
-    return;
+    ElMessage.warning("请选择生效日期")
+    return
   }
   try {
     await childStore.addGradeHistory(promotingChild.value.id, {
       grade: f.grade.trim(),
       effective_from: f.effective_from,
       note: f.note.trim() || null,
-    });
-    ElMessage.success("已升年级，时间轴已自动留痕");
-    promoteDialogVisible.value = false;
-  } catch (e) { /* axios */ }
-};
+    })
+    ElMessage.success("已升年级，时间轴已自动留痕")
+    promoteDialogVisible.value = false
+  } catch (e) {
+    /* axios */
+  }
+}
 
 // 删除某条历史
 const removeHistory = async (child, historyId) => {
@@ -121,27 +125,27 @@ const removeHistory = async (child, historyId) => {
       type: "warning",
       confirmButtonText: "删除",
       cancelButtonText: "取消",
-    });
-    await childStore.removeGradeHistory(child.id, historyId);
-    ElMessage.success("已删除");
+    })
+    await childStore.removeGradeHistory(child.id, historyId)
+    ElMessage.success("已删除")
   } catch (e) {
     /* user cancel */
   }
-};
+}
 
 // 展开/收起历史
 const toggleHistory = (childId) => {
   if (expandedHistory.value.has(childId)) {
-    expandedHistory.value.delete(childId);
+    expandedHistory.value.delete(childId)
   } else {
-    expandedHistory.value.add(childId);
+    expandedHistory.value.add(childId)
   }
-};
+}
 
-const colorOptions = ["#6366f1", "#10b981", "#f59e0b", "#ef4444", "#8b5cf6", "#06b6d4", "#ec4899"];
+const colorOptions = ["#6366f1", "#10b981", "#f59e0b", "#ef4444", "#8b5cf6", "#06b6d4", "#ec4899"]
 
 // 计算每个 child 的历史
-const historyOf = (childId) => childStore.gradeHistoryMap[childId] || [];
+const historyOf = (childId) => childStore.gradeHistoryMap[childId] || []
 </script>
 
 <template>
@@ -153,9 +157,7 @@ const historyOf = (childId) => childStore.gradeHistoryMap[childId] || [];
           最多支持 {{ childStore.maxChildren }} 个孩子，可一键切换。每个孩子的升年级会留痕到时间轴
         </p>
       </div>
-      <button class="btn-primary" :disabled="!childStore.canAddMore" @click="openCreate">
-        + 添加孩子
-      </button>
+      <button class="btn-primary" :disabled="!childStore.canAddMore" @click="openCreate">+ 添加孩子</button>
     </div>
 
     <div v-if="childStore.children.length === 0" class="card p-10 text-center">
@@ -219,8 +221,8 @@ const historyOf = (childId) => childStore.gradeHistoryMap[childId] || [];
               </div>
               <button
                 class="text-slate-300 hover:text-rose-500 opacity-0 group-hover:opacity-100"
-                @click="removeHistory(c, h.id)"
                 title="删除该条历史"
+                @click="removeHistory(c, h.id)"
               >
                 🗑
               </button>
@@ -229,7 +231,11 @@ const historyOf = (childId) => childStore.gradeHistoryMap[childId] || [];
         </div>
 
         <div class="flex gap-2 mt-4">
-          <button v-if="childStore.currentId !== c.id" class="btn-secondary flex-1" @click="childStore.setCurrent(c.id)">
+          <button
+            v-if="childStore.currentId !== c.id"
+            class="btn-secondary flex-1"
+            @click="childStore.setCurrent(c.id)"
+          >
             切换到此孩子
           </button>
           <button class="btn-primary flex-1" @click="openPromote(c)">🎓 升年级</button>
@@ -246,17 +252,29 @@ const historyOf = (childId) => childStore.gradeHistoryMap[childId] || [];
       <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
         <div v-for="c in compareData.children" :key="c.id" class="p-4 rounded-xl border border-slate-200">
           <div class="flex items-center gap-2 mb-3">
-            <div class="w-9 h-9 rounded-full flex items-center justify-center text-white font-medium"
-                 :style="{ backgroundColor: c.avatar_color }">{{ c.name.charAt(0) }}</div>
+            <div
+              class="w-9 h-9 rounded-full flex items-center justify-center text-white font-medium"
+              :style="{ backgroundColor: c.avatar_color }"
+            >
+              {{ c.name.charAt(0) }}
+            </div>
             <div>
               <div class="font-medium text-slate-800">{{ c.name }}</div>
               <div class="text-xs text-slate-500">{{ c.grade }} · {{ c.total_exams }} 次考试</div>
             </div>
           </div>
           <div class="space-y-2 text-sm">
-            <div class="flex justify-between"><span class="text-slate-500">平均分</span><span class="font-medium">{{ c.average_score }}%</span></div>
-            <div class="flex justify-between"><span class="text-slate-500">最强科目</span><span class="font-medium text-emerald-600">{{ c.best_subject || "—" }}</span></div>
-            <div class="flex justify-between"><span class="text-slate-500">需要关注</span><span class="font-medium text-amber-600">{{ c.needs_attention_subject || "—" }}</span></div>
+            <div class="flex justify-between">
+              <span class="text-slate-500">平均分</span><span class="font-medium">{{ c.average_score }}%</span>
+            </div>
+            <div class="flex justify-between">
+              <span class="text-slate-500">最强科目</span
+              ><span class="font-medium text-emerald-600">{{ c.best_subject || "—" }}</span>
+            </div>
+            <div class="flex justify-between">
+              <span class="text-slate-500">需要关注</span
+              ><span class="font-medium text-amber-600">{{ c.needs_attention_subject || "—" }}</span>
+            </div>
           </div>
         </div>
       </div>
@@ -270,9 +288,7 @@ const historyOf = (childId) => childStore.gradeHistoryMap[childId] || [];
         </el-form-item>
         <el-form-item label="年级">
           <el-input v-model="form.grade" placeholder="如：三年级 / 初二" />
-          <div class="text-xs text-slate-400 mt-1">
-            💡 修改年级请用下方「升年级」按钮（会留痕到时间轴）
-          </div>
+          <div class="text-xs text-slate-400 mt-1">💡 修改年级请用下方「升年级」按钮（会留痕到时间轴）</div>
         </el-form-item>
         <el-form-item label="学校">
           <el-input v-model="form.school" placeholder="选填" />
@@ -304,9 +320,7 @@ const historyOf = (childId) => childStore.gradeHistoryMap[childId] || [];
             placeholder="选择孩子的出生日期"
             class="w-full"
           />
-          <div class="text-xs text-slate-400 mt-1">
-            💡 用于身高、体重、BMI 生长曲线查表与年龄计算
-          </div>
+          <div class="text-xs text-slate-400 mt-1">💡 用于身高、体重、BMI 生长曲线查表与年龄计算</div>
         </el-form-item>
         <el-form-item label="性别">
           <el-radio-group v-model="form.gender">
@@ -314,9 +328,7 @@ const historyOf = (childId) => childStore.gradeHistoryMap[childId] || [];
             <el-radio-button value="male">男</el-radio-button>
             <el-radio-button value="female">女</el-radio-button>
           </el-radio-group>
-          <div class="text-xs text-slate-400 mt-1">
-            用于 BMI / 身高生长曲线查表（如未填，BMI 按男孩参考）
-          </div>
+          <div class="text-xs text-slate-400 mt-1">用于 BMI / 身高生长曲线查表（如未填，BMI 按男孩参考）</div>
         </el-form-item>
         <el-form-item label="备注">
           <el-input v-model="form.notes" type="textarea" :rows="2" placeholder="如：性格特点、特长" />
@@ -332,8 +344,10 @@ const historyOf = (childId) => childStore.gradeHistoryMap[childId] || [];
     <el-dialog v-model="promoteDialogVisible" title="升年级" width="480px">
       <div v-if="promotingChild" class="space-y-3">
         <div class="text-sm text-slate-600">
-          当前孩子：<span class="font-medium">{{ promotingChild.name }}</span>
-          （当前年级：<span class="font-medium text-brand-600">{{ promotingChild.grade }}</span>）
+          当前孩子：<span class="font-medium">{{ promotingChild.name }}</span> （当前年级：<span
+            class="font-medium text-brand-600"
+            >{{ promotingChild.grade }}</span
+          >）
         </div>
         <el-form label-position="top">
           <el-form-item label="新年级" required>
@@ -343,7 +357,13 @@ const historyOf = (childId) => childStore.gradeHistoryMap[childId] || [];
             <el-date-picker v-model="promoteForm.effective_from" type="date" value-format="YYYY-MM-DD" class="w-full" />
           </el-form-item>
           <el-form-item label="备注（可选）">
-            <el-input v-model="promoteForm.note" type="textarea" :rows="2" placeholder="如：暑假后升入四年级" maxlength="256" />
+            <el-input
+              v-model="promoteForm.note"
+              type="textarea"
+              :rows="2"
+              placeholder="如：暑假后升入四年级"
+              maxlength="256"
+            />
           </el-form-item>
         </el-form>
         <div class="bg-amber-50 border border-amber-200 rounded-lg p-3 text-xs text-amber-800 leading-relaxed">

@@ -3,7 +3,9 @@
 @tailwind utilities;
 
 @layer base {
-  html, body, #app {
+  html,
+  body,
+  #app {
     height: 100%;
     -webkit-tap-highlight-color: transparent;
     -webkit-touch-callout: none;
@@ -18,16 +20,26 @@
     /* Android/iPad 中文字体优先 */
     font-family: "Noto Sans CJK SC", "PingFang SC", "Microsoft YaHei", "Inter", "system-ui", "sans-serif";
     /* 允许输入框内选中文本 */
-    input, textarea, [contenteditable] {
+    input,
+    textarea,
+    [contenteditable] {
       -webkit-user-select: text;
       user-select: text;
     }
   }
   /* iOS Safari 安全区域 */
-  .safe-top { padding-top: env(safe-area-inset-top); }
-  .safe-bottom { padding-bottom: env(safe-area-inset-bottom); }
-  .safe-left { padding-left: env(safe-area-inset-left); }
-  .safe-right { padding-right: env(safe-area-inset-right); }
+  .safe-top {
+    padding-top: env(safe-area-inset-top);
+  }
+  .safe-bottom {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+  .safe-left {
+    padding-left: env(safe-area-inset-left);
+  }
+  .safe-right {
+    padding-right: env(safe-area-inset-right);
+  }
 }
 
 @layer components {
@@ -64,11 +76,21 @@
   .badge {
     @apply inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium;
   }
-  .badge-up { @apply badge bg-emerald-50 text-emerald-700; }
-  .badge-down { @apply badge bg-rose-50 text-rose-700; }
-  .badge-flat { @apply badge bg-slate-100 text-slate-600; }
-  .badge-warn { @apply badge bg-amber-50 text-amber-700; }
-  .badge-info { @apply badge bg-brand-50 text-brand-700; }
+  .badge-up {
+    @apply badge bg-emerald-50 text-emerald-700;
+  }
+  .badge-down {
+    @apply badge bg-rose-50 text-rose-700;
+  }
+  .badge-flat {
+    @apply badge bg-slate-100 text-slate-600;
+  }
+  .badge-warn {
+    @apply badge bg-amber-50 text-amber-700;
+  }
+  .badge-info {
+    @apply badge bg-brand-50 text-brand-700;
+  }
 
   /* 练习答题区：选项卡片触摸优化 */
   .answer-option {
@@ -88,16 +110,32 @@
 }
 
 @keyframes option-pop {
-  0% { transform: scale(1); }
-  45% { transform: scale(1.04); }
-  100% { transform: scale(1); }
+  0% {
+    transform: scale(1);
+  }
+  45% {
+    transform: scale(1.04);
+  }
+  100% {
+    transform: scale(1);
+  }
 }
 
 /* 全局滚动条（触控优化） */
-::-webkit-scrollbar { width: 6px; height: 6px; }
-::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
-::-webkit-scrollbar-thumb:hover { background: #94a6b8; }
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #94a6b8;
+}
 
 /* Element Plus 移动端覆盖
    注意:element-plus 按需引入后组件样式为 lazy 加载(晚于本文件),
@@ -123,7 +161,9 @@
     width: 100% !important;
   }
   /* 减少卡片内边距，适配小屏 */
-  .card { @apply rounded-xl; }
+  .card {
+    @apply rounded-xl;
+  }
 }
 
 /* iPad 横屏优化 */
@@ -135,7 +175,9 @@
 
 /* 减少动画偏好 */
 @media (prefers-reduced-motion: reduce) {
-  *, *::before, *::after {
+  *,
+  *::before,
+  *::after {
     animation-duration: 0.01ms !important;
     transition-duration: 0.01ms !important;
   }

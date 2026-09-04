@@ -1,5 +1,5 @@
-import { defineStore } from "pinia";
-import { authAPI } from "@/api";
+import { defineStore } from "pinia"
+import { authAPI } from "@/api"
 
 export const useAuthStore = defineStore("auth", {
   state: () => ({
@@ -18,9 +18,9 @@ export const useAuthStore = defineStore("auth", {
   },
   actions: {
     async checkSetup() {
-      const r = await authAPI.setupStatus();
-      this.needsSetup = r.needs_setup;
-      return r.needs_setup;
+      const r = await authAPI.setupStatus()
+      this.needsSetup = r.needs_setup
+      return r.needs_setup
     },
     async setup({ familyName, username, password, displayName }) {
       const r = await authAPI.setup({
@@ -28,46 +28,46 @@ export const useAuthStore = defineStore("auth", {
         username,
         password,
         display_name: displayName,
-      });
-      this._persist(r.access_token, r.user, null);
-      this.needsSetup = false;
-      return r.user;
+      })
+      this._persist(r.access_token, r.user, null)
+      this.needsSetup = false
+      return r.user
     },
     async login(username, password) {
-      const r = await authAPI.login({ username, password });
-      const me = await authAPI.me(r.access_token);
-      this._persist(r.access_token, r.user, me.accessible_child_ids);
-      return r.user;
+      const r = await authAPI.login({ username, password })
+      const me = await authAPI.me(r.access_token)
+      this._persist(r.access_token, r.user, me.accessible_child_ids)
+      return r.user
     },
     async refreshMe() {
-      if (!this.token) return;
+      if (!this.token) return
       try {
-        const me = await authAPI.me(this.token);
-        this.accessibleChildIds = me.accessible_child_ids;
-        localStorage.setItem("accessible_child_ids", JSON.stringify(me.accessible_child_ids));
+        const me = await authAPI.me(this.token)
+        this.accessibleChildIds = me.accessible_child_ids
+        localStorage.setItem("accessible_child_ids", JSON.stringify(me.accessible_child_ids))
         // 校验成功：本次会话内不再重复校验
-        this.tokenValidated = true;
+        this.tokenValidated = true
       } catch (e) {
-        if (e.response?.status === 401) this.logout();
+        if (e.response?.status === 401) this.logout()
       }
     },
     logout() {
-      this.token = null;
-      this.user = null;
-      this.accessibleChildIds = [];
-      localStorage.removeItem("access_token");
-      localStorage.removeItem("user");
-      localStorage.removeItem("accessible_child_ids");
+      this.token = null
+      this.user = null
+      this.accessibleChildIds = []
+      localStorage.removeItem("access_token")
+      localStorage.removeItem("user")
+      localStorage.removeItem("accessible_child_ids")
     },
     _persist(token, user, accessible) {
-      this.token = token;
-      this.user = user;
+      this.token = token
+      this.user = user
       if (accessible !== null) {
-        this.accessibleChildIds = accessible;
-        localStorage.setItem("accessible_child_ids", JSON.stringify(accessible));
+        this.accessibleChildIds = accessible
+        localStorage.setItem("accessible_child_ids", JSON.stringify(accessible))
       }
-      localStorage.setItem("access_token", token);
-      localStorage.setItem("user", JSON.stringify(user));
+      localStorage.setItem("access_token", token)
+      localStorage.setItem("user", JSON.stringify(user))
     },
   },
-});
+})

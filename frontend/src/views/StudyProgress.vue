@@ -4,9 +4,7 @@
     <div class="flex items-center justify-between">
       <div>
         <h1 class="text-2xl font-bold text-slate-800">📚 教材学习进度</h1>
-        <p class="text-sm text-slate-500 mt-1">
-          按教材单元追踪掌握度 · 答题自动更新 · 完成解锁小成就 🎉
-        </p>
+        <p class="text-sm text-slate-500 mt-1">按教材单元追踪掌握度 · 答题自动更新 · 完成解锁小成就 🎉</p>
       </div>
       <div class="flex items-center gap-2">
         <el-select v-model="selectedVersionId" placeholder="选择教材版本" class="!w-72" @change="reload">
@@ -91,14 +89,15 @@
             v-for="w in u.topic_words.slice(0, 6)"
             :key="w"
             class="text-xs px-2 py-0.5 rounded bg-slate-100 text-slate-700"
-          >{{ w }}</span>
+            >{{ w }}</span
+          >
           <span v-if="u.topic_words.length > 6" class="text-xs text-slate-400">+{{ u.topic_words.length - 6 }}</span>
         </div>
 
         <!-- Sound 拼读 -->
         <div v-if="u.sound" class="text-xs mb-3 flex items-center gap-2">
           <span class="px-1.5 py-0.5 rounded bg-pink-100 text-pink-700">🔤 {{ u.sound }}</span>
-          <span class="text-slate-500">{{ (u.sound_examples || []).slice(0, 3).join(' / ') }}</span>
+          <span class="text-slate-500">{{ (u.sound_examples || []).slice(0, 3).join(" / ") }}</span>
         </div>
 
         <!-- 知识点标签 -->
@@ -108,8 +107,11 @@
             :key="kp.knowledge_point_id"
             class="px-1.5 py-0.5 rounded bg-blue-50 text-blue-700"
             :title="kp.name"
-          >🏷️ {{ kp.name }}</span>
-          <span v-if="(kpsByUnitId[u.id] || []).length > 4" class="text-slate-400">+{{ (kpsByUnitId[u.id] || []).length - 4 }}</span>
+            >🏷️ {{ kp.name }}</span
+          >
+          <span v-if="(kpsByUnitId[u.id] || []).length > 4" class="text-slate-400"
+            >+{{ (kpsByUnitId[u.id] || []).length - 4 }}</span
+          >
         </div>
 
         <!-- 结构 -->
@@ -138,8 +140,10 @@
         <!-- 知识点掌握度（可展开） -->
         <div v-if="(kpsByUnitId[u.id] || []).length" class="mb-3">
           <div class="flex items-center justify-between cursor-pointer" @click="toggleKpDetail(u)">
-            <div class="text-xs font-medium text-slate-600">🎯 知识点掌握度 ({{ (kpDetailOf(u)?.kp_details || []).length }} KP)</div>
-            <span class="text-xs text-brand-600">{{ expandedKpUnitId === u.id ? '收起' : '展开' }}</span>
+            <div class="text-xs font-medium text-slate-600">
+              🎯 知识点掌握度 ({{ (kpDetailOf(u)?.kp_details || []).length }} KP)
+            </div>
+            <span class="text-xs text-brand-600">{{ expandedKpUnitId === u.id ? "收起" : "展开" }}</span>
           </div>
           <div v-if="expandedKpUnitId === u.id && kpDetailOf(u)" class="mt-2 space-y-1.5">
             <div
@@ -169,7 +173,7 @@
           <el-button size="small" plain @click="goPractice(u)">📝 练一练</el-button>
           <el-button v-if="u.is_project" size="small" plain type="primary" @click="goProject(u)">🎨 作品</el-button>
           <el-button size="small" plain @click="toggleWords(u)">
-            {{ expandedUnitId === u.id ? '收起' : '查看主题词' }}
+            {{ expandedUnitId === u.id ? "收起" : "查看主题词" }}
           </el-button>
         </div>
 
@@ -196,197 +200,195 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onUnmounted } from "vue";
-import { useRouter } from "vue-router";
-import { ElMessage } from "element-plus";
-import { useChildStore } from "@/stores/child";
-import { textbookAPI, studyProgressAPI, questionBanksAPI, kpProgressAPI } from "@/api";
+import { ref, computed, onMounted, onUnmounted } from "vue"
+import { useRouter } from "vue-router"
+import { ElMessage } from "element-plus"
+import { useChildStore } from "@/stores/child"
+import { textbookAPI, studyProgressAPI, questionBanksAPI, kpProgressAPI } from "@/api"
 
-const kpsByUnitId = ref({});
+const kpsByUnitId = ref({})
 // 新增：KP 掌握度数据（per unit）
-const kpMasteryByUnitId = ref({});
-const expandedKpUnitId = ref(null);
+const kpMasteryByUnitId = ref({})
+const expandedKpUnitId = ref(null)
 
-const MASTERY_LABELS = { new: "新学", learning: "学习中", strong: "较扎实", mastered: "已掌握" };
-const MASTERY_COLORS = { new: "#94a3b8", learning: "#f59e0b", strong: "#3b82f6", mastered: "#10b981" };
+const MASTERY_LABELS = { new: "新学", learning: "学习中", strong: "较扎实", mastered: "已掌握" }
+const MASTERY_COLORS = { new: "#94a3b8", learning: "#f59e0b", strong: "#3b82f6", mastered: "#10b981" }
 
 async function loadKpsForUnits(units) {
-  const result = {};
+  const result = {}
   await Promise.all(
     units.map(async (u) => {
       try {
-        result[u.id] = await textbookAPI.listKnowledgePointsForUnit(u.id);
+        result[u.id] = await textbookAPI.listKnowledgePointsForUnit(u.id)
       } catch {
-        result[u.id] = [];
+        result[u.id] = []
       }
-    })
-  );
-  kpsByUnitId.value = result;
+    }),
+  )
+  kpsByUnitId.value = result
 }
 
 async function loadKpMasteryForUnits(units) {
-  const childId = childStore.current?.id;
-  if (!childId) return;
-  const result = {};
+  const childId = childStore.current?.id
+  if (!childId) return
+  const result = {}
   await Promise.all(
     units.map(async (u) => {
       try {
-        result[u.id] = await kpProgressAPI.getForUnit(childId, u.id);
+        result[u.id] = await kpProgressAPI.getForUnit(childId, u.id)
       } catch {
-        result[u.id] = null;
+        result[u.id] = null
       }
-    })
-  );
-  kpMasteryByUnitId.value = result;
+    }),
+  )
+  kpMasteryByUnitId.value = result
 }
 
-const router = useRouter();
-const childStore = useChildStore();
-let reloadTimer = null;
+const router = useRouter()
+const childStore = useChildStore()
+let reloadTimer = null
 
-const loading = ref(false);
-const versions = ref([]);
-const selectedVersionId = ref(null);
-const summary = ref(null);
-const expandedUnitId = ref(null);
+const loading = ref(false)
+const versions = ref([])
+const selectedVersionId = ref(null)
+const summary = ref(null)
+const expandedUnitId = ref(null)
 
 const masterCount = computed(() => {
-  if (!summary.value) return 0;
-  return Object.values(summary.value.progress_map || {}).filter(
-    (p) => p.status === "mastered"
-  ).length;
-});
+  if (!summary.value) return 0
+  return Object.values(summary.value.progress_map || {}).filter((p) => p.status === "mastered").length
+})
 
 const nextUnit = computed(() => {
-  if (!summary.value) return null;
-  const units = summary.value.units;
-  const map = summary.value.progress_map || {};
+  if (!summary.value) return null
+  const units = summary.value.units
+  const map = summary.value.progress_map || {}
   for (const u of units) {
-    const p = map[u.id];
-    if (!p || p.status !== "mastered") return u;
+    const p = map[u.id]
+    if (!p || p.status !== "mastered") return u
   }
-  return null;
-});
+  return null
+})
 
 function statusOf(u) {
-  if (!summary.value) return "not_started";
-  const p = summary.value.progress_map?.[u.id];
-  return p?.status || "not_started";
+  if (!summary.value) return "not_started"
+  const p = summary.value.progress_map?.[u.id]
+  return p?.status || "not_started"
 }
 
 function progressOf(u) {
-  if (!summary.value) return { completion_pct: 0, total_attempts: 0, accuracy: 0 };
-  const p = summary.value.progress_map?.[u.id] || {};
+  if (!summary.value) return { completion_pct: 0, total_attempts: 0, accuracy: 0 }
+  const p = summary.value.progress_map?.[u.id] || {}
   return {
     completion_pct: p.completion_pct || 0,
     total_attempts: p.total_attempts || 0,
     accuracy: p.accuracy || 0,
-  };
+  }
 }
 
 function statusClass(u) {
-  const s = statusOf(u);
-  if (s === "mastered") return "!border-green-300";
-  if (s === "in_progress") return "!border-amber-300";
-  return "";
+  const s = statusOf(u)
+  if (s === "mastered") return "!border-green-300"
+  if (s === "in_progress") return "!border-amber-300"
+  return ""
 }
 
 function progressColor(u) {
-  const s = statusOf(u);
-  if (s === "mastered") return "#10b981";
-  if (s === "in_progress") return "#f59e0b";
-  return "#94a3b8";
+  const s = statusOf(u)
+  if (s === "mastered") return "#10b981"
+  if (s === "in_progress") return "#f59e0b"
+  return "#94a3b8"
 }
 
 function toggleWords(u) {
-  expandedUnitId.value = expandedUnitId.value === u.id ? null : u.id;
+  expandedUnitId.value = expandedUnitId.value === u.id ? null : u.id
 }
 
 function toggleKpDetail(u) {
-  expandedKpUnitId.value = expandedKpUnitId.value === u.id ? null : u.id;
+  expandedKpUnitId.value = expandedKpUnitId.value === u.id ? null : u.id
   if (expandedKpUnitId.value === u.id && !kpMasteryByUnitId.value[u.id]) {
-    loadKpMasteryForUnits([u]);
+    loadKpMasteryForUnits([u])
   }
 }
 
 function masteryColor(level) {
-  return MASTERY_COLORS[level] || MASTERY_COLORS.new;
+  return MASTERY_COLORS[level] || MASTERY_COLORS.new
 }
 
 function masteryLabel(level) {
-  return MASTERY_LABELS[level] || level;
+  return MASTERY_LABELS[level] || level
 }
 
 function kpDetailOf(u) {
-  return kpMasteryByUnitId.value[u.id] || null;
+  return kpMasteryByUnitId.value[u.id] || null
 }
 
 function kpName(kpId, unitId) {
-  const kps = kpsByUnitId.value[unitId] || [];
-  const kp = kps.find((k) => k.knowledge_point_id === kpId);
-  return kp?.name || `KP-${kpId}`;
+  const kps = kpsByUnitId.value[unitId] || []
+  const kp = kps.find((k) => k.knowledge_point_id === kpId)
+  return kp?.name || `KP-${kpId}`
 }
 
 async function loadVersions() {
   try {
-    versions.value = await textbookAPI.listVersions({ is_active: true });
+    versions.value = await textbookAPI.listVersions({ is_active: true })
     if (versions.value.length && !selectedVersionId.value) {
-      const english = versions.value.filter((v) => v.subject === "英语");
-      selectedVersionId.value = (english[0] || versions.value[0])?.id;
+      const english = versions.value.filter((v) => v.subject === "英语")
+      selectedVersionId.value = (english[0] || versions.value[0])?.id
     }
   } catch (e) {
-    ElMessage.error("教材版本加载失败");
+    ElMessage.error("教材版本加载失败")
   }
 }
 
 async function reload() {
-  const childId = childStore.current?.id;
+  const childId = childStore.current?.id
   if (!childId) {
-    ElMessage.warning("请先选择孩子");
-    return;
+    ElMessage.warning("请先选择孩子")
+    return
   }
-  if (!selectedVersionId.value) return;
-  loading.value = true;
+  if (!selectedVersionId.value) return
+  loading.value = true
   try {
-    summary.value = await studyProgressAPI.getSummary(childId, selectedVersionId.value);
-    await loadKpsForUnits(summary.value.units);
+    summary.value = await studyProgressAPI.getSummary(childId, selectedVersionId.value)
+    await loadKpsForUnits(summary.value.units)
   } catch (e) {
-    ElMessage.error("进度加载失败");
+    ElMessage.error("进度加载失败")
   } finally {
-    loading.value = false;
+    loading.value = false
   }
 }
 
 async function goPractice(u) {
-  const childId = childStore.current?.id;
+  const childId = childStore.current?.id
   if (!childId) {
-    ElMessage.warning("请先选择孩子");
-    return;
+    ElMessage.warning("请先选择孩子")
+    return
   }
-  const banks = await questionBanksAPI.list({ grade: "四年级", subject: "英语" });
-  const bank = banks[0];
+  const banks = await questionBanksAPI.list({ grade: "四年级", subject: "英语" })
+  const bank = banks[0]
   if (!bank) {
-    ElMessage.warning("暂未找到题库");
-    return;
+    ElMessage.warning("暂未找到题库")
+    return
   }
   router.push({
     name: "exercise",
     query: { bank_id: bank.id, child_id: childId, knowledge_point: `${u.code}` },
-  });
+  })
 }
 
 function goProject(u) {
-  router.push({ name: "project-works", query: { unit_id: u.id } });
+  router.push({ name: "project-works", query: { unit_id: u.id } })
 }
 
 onMounted(async () => {
-  await loadVersions();
-  reloadTimer = setTimeout(() => reload(), 200);
-});
+  await loadVersions()
+  reloadTimer = setTimeout(() => reload(), 200)
+})
 
 onUnmounted(() => {
-  if (reloadTimer) clearTimeout(reloadTimer);
-});
+  if (reloadTimer) clearTimeout(reloadTimer)
+})
 </script>
 
 <style scoped>

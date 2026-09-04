@@ -1,33 +1,30 @@
 <script setup>
-import { ref, onMounted, computed } from "vue";
-import { ElMessage, ElMessageBox } from "element-plus";
-import { useChildStore } from "@/stores/child";
-import { knowledgePointsAPI } from "@/api";
-import { SUBJECT_COLOR_MAP, CUSTOM_SUBJECT_COLOR } from "@/constants/subjects";
+import { ref, onMounted, computed } from "vue"
+import { ElMessage, ElMessageBox } from "element-plus"
+import { useChildStore } from "@/stores/child"
+import { knowledgePointsAPI } from "@/api"
+import { SUBJECT_COLOR_MAP, CUSTOM_SUBJECT_COLOR } from "@/constants/subjects"
 
-const childStore = useChildStore();
+const childStore = useChildStore()
 
 // 按科目给标签上色：科目色描边 + 同色浅底 + 同色深字（自定义科目用中性灰）
-const subjectChipClass = (subject) =>
-  SUBJECT_COLOR_MAP[subject] || CUSTOM_SUBJECT_COLOR;
+const subjectChipClass = (subject) => SUBJECT_COLOR_MAP[subject] || CUSTOM_SUBJECT_COLOR
 
 // 从配色串里取 text-* 类，给科目分组标题上色
 const subjectTextClass = (subject) =>
-  (SUBJECT_COLOR_MAP[subject] || CUSTOM_SUBJECT_COLOR)
-    .split(" ")
-    .find((c) => c.startsWith("text-")) || "text-slate-600";
+  (SUBJECT_COLOR_MAP[subject] || CUSTOM_SUBJECT_COLOR).split(" ").find((c) => c.startsWith("text-")) || "text-slate-600"
 
-const loading = ref(false);
-const points = ref([]);
-const filterSubject = ref("");
-const filterCategory = ref("");
-const filterGradeLevel = ref("");
-const searchKeyword = ref("");
+const loading = ref(false)
+const points = ref([])
+const filterSubject = ref("")
+const filterCategory = ref("")
+const filterGradeLevel = ref("")
+const searchKeyword = ref("")
 
-const gradeLevelOptions = ref([]);
+const gradeLevelOptions = ref([])
 
-const dialogVisible = ref(false);
-const editing = ref(null);
+const dialogVisible = ref(false)
+const editing = ref(null)
 
 const blank = () => ({
   subject: childStore.current?.subjects?.[0] || "",
@@ -35,91 +32,92 @@ const blank = () => ({
   category: "",
   description: "",
   grade_level: "",
-});
+})
 
-const form = ref(blank());
+const form = ref(blank())
 
 const fetchList = async () => {
-  loading.value = true;
+  loading.value = true
   try {
     points.value = await knowledgePointsAPI.list({
       subject: filterSubject.value || undefined,
       category: filterCategory.value || undefined,
       grade_level: filterGradeLevel.value || undefined,
       keyword: searchKeyword.value.trim() || undefined,
-    });
+    })
   } finally {
-    loading.value = false;
+    loading.value = false
   }
-};
+}
 
 const fetchGradeLevels = async () => {
   try {
-    gradeLevelOptions.value = await knowledgePointsAPI.listGradeLevels();
+    gradeLevelOptions.value = await knowledgePointsAPI.listGradeLevels()
   } catch {
-    gradeLevelOptions.value = [];
+    gradeLevelOptions.value = []
   }
-};
+}
 
 onMounted(async () => {
-  await Promise.all([fetchList(), fetchGradeLevels()]);
-});
+  await Promise.all([fetchList(), fetchGradeLevels()])
+})
 
 const openCreate = () => {
-  editing.value = null;
-  form.value = blank();
-  dialogVisible.value = true;
-};
+  editing.value = null
+  form.value = blank()
+  dialogVisible.value = true
+}
 
 const openEdit = (p) => {
-  editing.value = p;
-  form.value = { ...blank(), ...p };
-  dialogVisible.value = true;
-};
+  editing.value = p
+  form.value = { ...blank(), ...p }
+  dialogVisible.value = true
+}
 
 const submit = async () => {
   if (!form.value.subject || !form.value.name.trim()) {
-    ElMessage.warning("请填写科目和知识点名称");
-    return;
+    ElMessage.warning("请填写科目和知识点名称")
+    return
   }
   try {
     if (editing.value) {
-      await knowledgePointsAPI.update(editing.value.id, form.value);
-      ElMessage.success("已更新");
+      await knowledgePointsAPI.update(editing.value.id, form.value)
+      ElMessage.success("已更新")
     } else {
-      await knowledgePointsAPI.create(form.value);
-      ElMessage.success("已添加");
+      await knowledgePointsAPI.create(form.value)
+      ElMessage.success("已添加")
     }
-    dialogVisible.value = false;
-    await fetchList();
-  } catch (e) { /* axios 已提示 */ }
-};
+    dialogVisible.value = false
+    await fetchList()
+  } catch (e) {
+    /* axios 已提示 */
+  }
+}
 
 const remove = async (p) => {
-  await ElMessageBox.confirm(`确认删除知识点「${p.name}」吗？`, "删除", { type: "warning" });
-  await knowledgePointsAPI.remove(p.id);
-  ElMessage.success("已删除");
-  await fetchList();
-};
+  await ElMessageBox.confirm(`确认删除知识点「${p.name}」吗？`, "删除", { type: "warning" })
+  await knowledgePointsAPI.remove(p.id)
+  ElMessage.success("已删除")
+  await fetchList()
+}
 
 const subjectOptions = computed(() => {
-  const set = new Set(["语文", "数学", "英语", "科学", "信息科技", "生物", "地理", "物理"]);
-  (childStore.current?.subjects || []).forEach((s) => set.add(s));
-  return Array.from(set);
-});
+  const set = new Set(["语文", "数学", "英语", "科学", "信息科技", "生物", "地理", "物理"])
+  ;(childStore.current?.subjects || []).forEach((s) => set.add(s))
+  return Array.from(set)
+})
 
 const grouped = () => {
-  const groups = {};
+  const groups = {}
   points.value.forEach((p) => {
-    const grade = p.grade_level || "未分年级";
-    const subject = p.subject || "未分类";
-    if (!groups[grade]) groups[grade] = {};
-    if (!groups[grade][subject]) groups[grade][subject] = [];
-    groups[grade][subject].push(p);
-  });
-  return groups;
-  
-};
+    const grade = p.grade_level || "未分年级"
+    const subject = p.subject || "未分类"
+    if (!groups[grade]) groups[grade] = {}
+    if (!groups[grade][subject]) groups[grade][subject] = []
+    groups[grade][subject].push(p)
+  })
+  return groups
+}
 </script>
 
 <template>
@@ -134,10 +132,24 @@ const grouped = () => {
 
     <!-- 筛选 -->
     <div class="card p-3 mb-4 flex gap-2 flex-wrap items-center">
-      <el-select v-model="filterSubject" placeholder="全部科目" clearable size="default" class="!w-36" @change="fetchList">
+      <el-select
+        v-model="filterSubject"
+        placeholder="全部科目"
+        clearable
+        size="default"
+        class="!w-36"
+        @change="fetchList"
+      >
         <el-option v-for="s in subjectOptions" :key="s" :label="s" :value="s" />
       </el-select>
-      <el-select v-model="filterGradeLevel" placeholder="全部年级" clearable size="default" class="!w-32" @change="fetchList">
+      <el-select
+        v-model="filterGradeLevel"
+        placeholder="全部年级"
+        clearable
+        size="default"
+        class="!w-32"
+        @change="fetchList"
+      >
         <el-option v-for="g in gradeLevelOptions" :key="g" :label="g" :value="g" />
       </el-select>
       <el-input

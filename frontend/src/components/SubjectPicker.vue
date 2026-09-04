@@ -1,87 +1,81 @@
 <script setup>
-import { ref, computed, watch } from "vue";
-import { ElMessage } from "element-plus";
-import {
-  PRESET_SUBJECTS,
-  PRESET_SUBJECTS_SET,
-  SUBJECT_COLOR_MAP,
-  CUSTOM_SUBJECT_COLOR,
-} from "@/constants/subjects";
+import { ref, computed, watch } from "vue"
+import { PRESET_SUBJECTS, PRESET_SUBJECTS_SET, SUBJECT_COLOR_MAP, CUSTOM_SUBJECT_COLOR } from "@/constants/subjects"
 
 const props = defineProps({
   modelValue: {
     type: Array,
     default: () => [],
   },
-});
+})
 
-const emit = defineEmits(["update:modelValue"]);
+const emit = defineEmits(["update:modelValue"])
 
-const selected = computed(() => props.modelValue || []);
-const customSubjects = computed(() => selected.value.filter((s) => !PRESET_SUBJECTS_SET.has(s)));
-const customActive = ref(customSubjects.value.length > 0); // 如果已有自定义，自动展开输入区
+const selected = computed(() => props.modelValue || [])
+const customSubjects = computed(() => selected.value.filter((s) => !PRESET_SUBJECTS_SET.has(s)))
+const customActive = ref(customSubjects.value.length > 0) // 如果已有自定义，自动展开输入区
 
-const customInput = ref("");
-const customError = ref("");
+const customInput = ref("")
+const customError = ref("")
 
 watch(
   () => customSubjects.value.length,
   (n) => {
     // 自定义清空后收起输入区
-    if (n === 0) customActive.value = false;
-  }
-);
+    if (n === 0) customActive.value = false
+  },
+)
 
-const isPresetSelected = (name) => selected.value.includes(name);
+const isPresetSelected = (name) => selected.value.includes(name)
 
 const togglePreset = (name) => {
-  const next = [...selected.value];
-  const idx = next.indexOf(name);
+  const next = [...selected.value]
+  const idx = next.indexOf(name)
   if (idx >= 0) {
-    next.splice(idx, 1);
+    next.splice(idx, 1)
   } else {
-    next.push(name);
+    next.push(name)
   }
-  emit("update:modelValue", next);
-};
+  emit("update:modelValue", next)
+}
 
 const removeCustom = (name) => {
   emit(
     "update:modelValue",
-    selected.value.filter((s) => s !== name)
-  );
-};
+    selected.value.filter((s) => s !== name),
+  )
+}
 
 const submitCustom = () => {
-  const v = customInput.value.trim();
-  if (!v) return;
+  const v = customInput.value.trim()
+  if (!v) return
   if (v.length > 16) {
-    customError.value = "科目名不能超过 16 字";
-    return;
+    customError.value = "科目名不能超过 16 字"
+    return
   }
   if (PRESET_SUBJECTS_SET.has(v)) {
-    customError.value = "这是预设科目，请直接点选";
-    return;
+    customError.value = "这是预设科目，请直接点选"
+    return
   }
   if (selected.value.includes(v)) {
-    customError.value = "已添加过这个科目";
-    return;
+    customError.value = "已添加过这个科目"
+    return
   }
-  emit("update:modelValue", [...selected.value, v]);
-  customInput.value = "";
-  customError.value = "";
-};
+  emit("update:modelValue", [...selected.value, v])
+  customInput.value = ""
+  customError.value = ""
+}
 
 const cancelCustom = () => {
-  customActive.value = false;
-  customInput.value = "";
-  customError.value = "";
-};
+  customActive.value = false
+  customInput.value = ""
+  customError.value = ""
+}
 
 const colorFor = (name) =>
   PRESET_SUBJECTS_SET.has(name)
     ? SUBJECT_COLOR_MAP[name] || "bg-slate-100 text-slate-700 border-slate-200"
-    : CUSTOM_SUBJECT_COLOR;
+    : CUSTOM_SUBJECT_COLOR
 </script>
 
 <template>
@@ -125,11 +119,7 @@ const colorFor = (name) =>
         @input="customError = ''"
       />
       <button class="btn-secondary text-sm flex-shrink-0" @click="submitCustom">添加</button>
-      <button
-        v-if="customSubjects.length === 0"
-        class="btn-ghost text-sm flex-shrink-0"
-        @click="cancelCustom"
-      >
+      <button v-if="customSubjects.length === 0" class="btn-ghost text-sm flex-shrink-0" @click="cancelCustom">
         取消
       </button>
     </div>
@@ -142,17 +132,14 @@ const colorFor = (name) =>
         <span
           v-for="s in customSubjects"
           :key="s"
-          :class="[
-            'inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs border',
-            colorFor(s),
-          ]"
+          :class="['inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs border', colorFor(s)]"
         >
           {{ s }}
           <button
             type="button"
             class="opacity-60 hover:opacity-100 leading-none"
-            @click="removeCustom(s)"
             :title="`移除 ${s}`"
+            @click="removeCustom(s)"
           >
             ×
           </button>

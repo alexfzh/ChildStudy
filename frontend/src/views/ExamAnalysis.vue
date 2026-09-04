@@ -1,163 +1,154 @@
 <script setup>
-import { ref, computed, onMounted, watch } from "vue";
-import { useRoute, useRouter } from "vue-router";
-import { ElMessage } from "element-plus";
-import { useChildStore } from "@/stores/child";
-import BaseChart from "@/components/charts/BaseChart.vue";
-import { examsAPI } from "@/api";
+import { ref, computed, onMounted, watch } from "vue"
+import { useRoute, useRouter } from "vue-router"
+import { useChildStore } from "@/stores/child"
+import BaseChart from "@/components/charts/BaseChart.vue"
+import { examsAPI } from "@/api"
 
-const route = useRoute();
-const router = useRouter();
-const childStore = useChildStore();
+const route = useRoute()
+const router = useRouter()
+const childStore = useChildStore()
 
-const childId = computed(() => childStore.current?.id);
+const childId = computed(() => childStore.current?.id)
 
-const loading = ref(false);
-const exams = ref([]);                    // 该孩子全部考试（侧栏用）
-const subject = ref("");                  // 当前科目
+const loading = ref(false)
+const exams = ref([]) // 该孩子全部考试（侧栏用）
+const subject = ref("") // 当前科目
 const subjects = computed(() => {
   // 从考试 + child.subjects 合并去重
-  const set = new Set(childStore.current?.subjects || []);
-  exams.value.forEach((e) => set.add(e.subject));
-  return Array.from(set);
-});
+  const set = new Set(childStore.current?.subjects || [])
+  exams.value.forEach((e) => set.add(e.subject))
+  return Array.from(set)
+})
 
 // 单次模式
-const singleExamId = ref(null);           // 选中的考试 ID
-const singleAnalysis = ref(null);         // 总分分析
-const paperAnalysis = ref(null);          // 卷面分析
+const singleExamId = ref(null) // 选中的考试 ID
+const singleAnalysis = ref(null) // 总分分析
+const paperAnalysis = ref(null) // 卷面分析
 
 // 历次模式
-const historyAnalysis = ref(null);        // 历次趋势
+const historyAnalysis = ref(null) // 历次趋势
 
 // Tab 状态
-const tab = ref("single");                // 'single' | 'history'
+const tab = ref("single") // 'single' | 'history'
 
 // ============ 数据加载 ============
 
 const fetchExams = async () => {
-  if (!childId.value) return;
-  loading.value = true;
+  if (!childId.value) return
+  loading.value = true
   try {
-    exams.value = await examsAPI.list({ child_id: childId.value });
+    exams.value = await examsAPI.list({ child_id: childId.value })
     if (!subject.value && exams.value.length) {
-      subject.value = exams.value[0].subject;
+      subject.value = exams.value[0].subject
     }
   } finally {
-    loading.value = false;
+    loading.value = false
   }
-};
+}
 
 const fetchSingleAnalysis = async () => {
   if (!singleExamId.value) {
-    singleAnalysis.value = null;
-    paperAnalysis.value = null;
-    return;
+    singleAnalysis.value = null
+    paperAnalysis.value = null
+    return
   }
-  loading.value = true;
+  loading.value = true
   try {
     const [a, p] = await Promise.all([
       examsAPI.analyze(singleExamId.value),
       examsAPI.paperAnalysis(singleExamId.value).catch(() => null),
-    ]);
-    singleAnalysis.value = a;
-    paperAnalysis.value = p;
+    ])
+    singleAnalysis.value = a
+    paperAnalysis.value = p
   } catch (e) {
-    singleAnalysis.value = null;
-    paperAnalysis.value = null;
+    singleAnalysis.value = null
+    paperAnalysis.value = null
   } finally {
-    loading.value = false;
+    loading.value = false
   }
-};
+}
 
 const fetchHistoryAnalysis = async () => {
   if (!subject.value) {
-    historyAnalysis.value = null;
-    return;
+    historyAnalysis.value = null
+    return
   }
-  loading.value = true;
+  loading.value = true
   try {
     historyAnalysis.value = await examsAPI.historyAnalysis({
       child_id: childId.value,
       subject: subject.value,
-    });
+    })
   } catch {
-    historyAnalysis.value = null;
+    historyAnalysis.value = null
   } finally {
-    loading.value = false;
+    loading.value = false
   }
-};
+}
 
 onMounted(async () => {
-  await fetchExams();
+  await fetchExams()
   // URL ?exam_id=X 进入单次分析
-  const qid = route.query.exam_id;
+  const qid = route.query.exam_id
   if (qid) {
-    singleExamId.value = Number(qid);
-    tab.value = "single";
-    await fetchSingleAnalysis();
+    singleExamId.value = Number(qid)
+    tab.value = "single"
+    await fetchSingleAnalysis()
   } else {
-    tab.value = "history";
-    await fetchHistoryAnalysis();
+    tab.value = "history"
+    await fetchHistoryAnalysis()
   }
-});
+})
 
 watch(childId, async (id) => {
   if (id) {
-    await fetchExams();
+    await fetchExams()
     if (tab.value === "single" && singleExamId.value) {
-      await fetchSingleAnalysis();
+      await fetchSingleAnalysis()
     } else {
-      await fetchHistoryAnalysis();
+      await fetchHistoryAnalysis()
     }
   }
-});
+})
 
 watch(subject, async () => {
   if (tab.value === "history") {
-    await fetchHistoryAnalysis();
+    await fetchHistoryAnalysis()
   } else if (singleExamId.value) {
-    await fetchSingleAnalysis();
+    await fetchSingleAnalysis()
   }
-});
+})
 
 watch(singleExamId, async () => {
-  if (tab.value === "single") await fetchSingleAnalysis();
-});
+  if (tab.value === "single") await fetchSingleAnalysis()
+})
 
 watch(tab, async (t) => {
-  if (t === "single" && singleExamId.value) await fetchSingleAnalysis();
-  if (t === "history") await fetchHistoryAnalysis();
-});
+  if (t === "single" && singleExamId.value) await fetchSingleAnalysis()
+  if (t === "history") await fetchHistoryAnalysis()
+})
 
 // ============ 辅助 ============
 
-const currentExam = computed(() =>
-  exams.value.find((e) => e.id === singleExamId.value) || null
-);
+const currentExam = computed(() => exams.value.find((e) => e.id === singleExamId.value) || null)
 
 // 同科目考试，按日期倒序
 const examsBySubject = computed(() =>
-  exams.value
-    .filter((e) => e.subject === subject.value)
-    .sort((a, b) => (a.exam_date < b.exam_date ? 1 : -1))
-);
+  exams.value.filter((e) => e.subject === subject.value).sort((a, b) => (a.exam_date < b.exam_date ? 1 : -1)),
+)
 
 // 趋势图 option（分数 + 班均）
 const trendChartOption = computed(() => {
-  if (!historyAnalysis.value || !historyAnalysis.value.score_trend?.length) return null;
-  const dates = historyAnalysis.value.score_trend.map((p) => p.date);
-  const scoreData = historyAnalysis.value.score_trend.map((p) => [
-    p.date,
-    p.score,
-    p.exam_name,
-  ]);
+  if (!historyAnalysis.value || !historyAnalysis.value.score_trend?.length) return null
+  const dates = historyAnalysis.value.score_trend.map((p) => p.date)
+  const scoreData = historyAnalysis.value.score_trend.map((p) => [p.date, p.score, p.exam_name])
   const avgData = historyAnalysis.value.score_trend
     .filter((p) => p.class_avg_delta !== null)
-    .map((p) => [p.date, p.score - p.class_avg_delta]);
+    .map((p) => [p.date, p.score - p.class_avg_delta])
   const targetData = historyAnalysis.value.target_progression
     .filter((p) => p.target != null)
-    .map((p) => [p.date, p.target]);
+    .map((p) => [p.date, p.target])
 
   return {
     tooltip: { trigger: "axis" },
@@ -189,18 +180,24 @@ const trendChartOption = computed(() => {
         lineStyle: { type: "dotted" },
       },
     ],
-  };
-});
+  }
+})
 
 // 题型聚合图（卷面分析用）
 const typeChartOption = computed(() => {
-  if (!paperAnalysis.value || !paperAnalysis.value.question_type_stats?.length) return null;
-  const types = paperAnalysis.value.question_type_stats;
+  if (!paperAnalysis.value || !paperAnalysis.value.question_type_stats?.length) return null
+  const types = paperAnalysis.value.question_type_stats
   const typeLabel = {
-    single_choice: "选择题", multi_choice: "多选题", true_false: "判断题",
-    fill_blank: "填空题", short_answer: "简答题", calculation: "计算题",
-    application: "应用题", essay: "作文", other: "其他",
-  };
+    single_choice: "选择题",
+    multi_choice: "多选题",
+    true_false: "判断题",
+    fill_blank: "填空题",
+    short_answer: "简答题",
+    calculation: "计算题",
+    application: "应用题",
+    essay: "作文",
+    other: "其他",
+  }
   return {
     tooltip: { trigger: "axis", axisPointer: { type: "shadow" } },
     legend: { data: ["得分", "失分"] },
@@ -223,17 +220,17 @@ const typeChartOption = computed(() => {
         itemStyle: { color: "#ef4444" },
       },
     ],
-  };
-});
+  }
+})
 
 const trendLabel = (t) => {
   const map = {
     rising: { text: "上升", cls: "text-emerald-600" },
     falling: { text: "下降", cls: "text-rose-600" },
     stable: { text: "平稳", cls: "text-slate-600" },
-  };
-  return map[t] || { text: t, cls: "" };
-};
+  }
+  return map[t] || { text: t, cls: "" }
+}
 
 const trendStrengthLabel = (s) => {
   const map = {
@@ -241,14 +238,14 @@ const trendStrengthLabel = (s) => {
     moderate: "中等",
     weak: "微弱",
     flat: "无变化",
-  };
-  return map[s] || s;
-};
+  }
+  return map[s] || s
+}
 
 const stabilityLabel = (s) => {
-  const map = { stable: "稳定", fluctuating: "波动", volatile: "剧烈" };
-  return map[s] || s;
-};
+  const map = { stable: "稳定", fluctuating: "波动", volatile: "剧烈" }
+  return map[s] || s
+}
 
 const positionLabel = (p) => {
   const map = {
@@ -258,9 +255,9 @@ const positionLabel = (p) => {
     near_worst: "下游",
     worst: "历史最低",
     only: "唯一一次",
-  };
-  return map[p] || p;
-};
+  }
+  return map[p] || p
+}
 </script>
 
 <template>
@@ -285,12 +282,16 @@ const positionLabel = (p) => {
           class="px-3 py-1 text-sm rounded transition"
           :class="tab === 'history' ? 'bg-brand-600 text-white' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'"
           @click="tab = 'history'"
-        >📈 历次趋势</button>
+        >
+          📈 历次趋势
+        </button>
         <button
           class="px-3 py-1 text-sm rounded transition"
           :class="tab === 'single' ? 'bg-brand-600 text-white' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'"
           @click="tab = 'single'"
-        >📊 单次分析</button>
+        >
+          📊 单次分析
+        </button>
       </div>
       <el-select
         v-if="tab === 'history'"
@@ -302,14 +303,7 @@ const positionLabel = (p) => {
       >
         <el-option v-for="s in subjects" :key="s" :label="s" :value="s" />
       </el-select>
-      <el-select
-        v-else
-        v-model="singleExamId"
-        filterable
-        size="default"
-        class="!w-72"
-        placeholder="选择某次考试"
-      >
+      <el-select v-else v-model="singleExamId" filterable size="default" class="!w-72" placeholder="选择某次考试">
         <el-option
           v-for="e in examsBySubject"
           :key="e.id"
@@ -357,7 +351,7 @@ const positionLabel = (p) => {
         </div>
 
         <!-- 趋势图 -->
-        <div class="card p-4 mb-4" v-if="trendChartOption">
+        <div v-if="trendChartOption" class="card p-4 mb-4">
           <div class="text-sm font-medium text-slate-700 mb-2">📈 分数走势</div>
           <BaseChart :option="trendChartOption" height="320px" />
         </div>
@@ -380,10 +374,10 @@ const positionLabel = (p) => {
             <table class="w-full text-sm">
               <thead>
                 <tr class="text-left text-slate-500 border-b">
-                      <th class="py-2">知识点</th>
-                      <th class="py-2">出现次数</th>
-                      <th class="py-2">累计失分</th>
-                    </tr>
+                  <th class="py-2">知识点</th>
+                  <th class="py-2">出现次数</th>
+                  <th class="py-2">累计失分</th>
+                </tr>
               </thead>
               <tbody>
                 <tr
@@ -408,7 +402,7 @@ const positionLabel = (p) => {
         <div class="text-4xl mb-2">🎯</div>
         <div class="text-sm">请选择某次考试进行分析</div>
       </div>
-      <template v-else-if="!singleAnalysis" class="text-slate-400">加载中…</template>
+      <template v-else-if="!singleAnalysis"><div class="text-slate-400">加载中…</div></template>
       <template v-else>
         <!-- 总分概览卡 -->
         <div v-if="currentExam" class="card p-4 mb-4">
@@ -422,7 +416,11 @@ const positionLabel = (p) => {
             </div>
             <div class="text-right text-sm text-slate-500">
               <div>📅 {{ singleAnalysis.exam_date }}</div>
-              <div v-if="singleAnalysis.trend_position">📊 {{ positionLabel(singleAnalysis.trend_position.position) }} · {{ singleAnalysis.trend_position.rank_in_n }}/{{ singleAnalysis.trend_position.total_n }} · {{ singleAnalysis.trend_position.percentile }}%</div>
+              <div v-if="singleAnalysis.trend_position">
+                📊 {{ positionLabel(singleAnalysis.trend_position.position) }} ·
+                {{ singleAnalysis.trend_position.rank_in_n }}/{{ singleAnalysis.trend_position.total_n }} ·
+                {{ singleAnalysis.trend_position.percentile }}%
+              </div>
             </div>
           </div>
         </div>
@@ -498,9 +496,7 @@ const positionLabel = (p) => {
                   <span class="text-slate-500">第 {{ q.number }} 题</span>
                   <span class="ml-2 text-slate-700">{{ q.section_name }}</span>
                 </div>
-                <div class="text-rose-600">
-                  {{ q.scored }} / {{ q.max_score }}（失 {{ q.loss }}）
-                </div>
+                <div class="text-rose-600">{{ q.scored }} / {{ q.max_score }}（失 {{ q.loss }}）</div>
               </div>
             </div>
           </div>
