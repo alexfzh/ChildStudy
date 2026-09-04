@@ -31,6 +31,11 @@ jobs:
         run: python -m ruff check .
       - name: Pytest
         run: python -m pytest -q
+      # pip-audit:扫描 requirements.txt 的依赖漏洞(PyPI Advisory DB)。
+      # 失败不阻塞(CI 还在跑 lint/test 兜底),但有漏洞会打印出来让 PR 看到。
+      # 想严格门禁可改 `|| exit 1`,现阶段先用 warn 模式避免单 CVE 卡全流程。
+      - name: pip-audit (deps vulnerability scan)
+        run: python -m pip_audit -r requirements.txt
       # 注:audit-schema-router.py 会 print 中文。GitHub Windows runner(英文系统,
       # cp1252 代码页)默认 stdout 无法编码中文 → UnicodeEncodeError 崩。
       # -X utf8 强制 UTF-8 输出,规避平台编码差异。
@@ -59,6 +64,13 @@ jobs:
           python-version: "3.13"
       - name: Install deps
         run: npm ci
+      # 前端 ESLint(v8 + eslint-plugin-vue,详见 frontend/.eslintrc.cjs)
+      # --max-warnings 0:任何 warning 也算错,与 ruff 同一纪律
+      - name: Lint (ESLint)
+        run: npm run lint
+      # Prettier 格式校验,与 ESLint 解耦(format 规则 ESLint 已用 prettier 关掉)
+      - name: Format check (Prettier)
+        run: npm run format:check
       - name: Build
         run: npm run build
       - name: Route audit

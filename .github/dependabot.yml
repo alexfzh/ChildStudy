@@ -1,0 +1,49 @@
+# Dependabot: 自动检测依赖更新并开 PR
+# - pip(后端)与 npm(前端)周更
+# - 每周一 09:00 (Asia/Shanghai, UTC+8) 跑,与常规 PR 错开
+# - commit 前缀 "deps" 便于筛选
+# - 限制最多同时 5 个 PR,避免风浪
+# - frontend 用 npm 生态(实际包管理器),backend 用 pip
+version: 2
+updates:
+  - package-ecosystem: "pip"
+    directory: "/backend"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "01:00"
+      timezone: "UTC"
+    commit-message:
+      prefix: "deps"
+    open-pull-requests-limit: 5
+    labels:
+      - "dependencies"
+      - "backend"
+
+  - package-ecosystem: "npm"
+    directory: "/frontend"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "01:00"
+      timezone: "UTC"
+    commit-message:
+      prefix: "deps"
+    open-pull-requests-limit: 5
+    labels:
+      - "dependencies"
+      - "frontend"
+
+  # GitHub Actions 周更:CI workflow 的 checkout/setup-python/setup-node 版本
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "01:00"
+      timezone: "UTC"
+    commit-message:
+      prefix: "deps"
+    labels:
+      - "dependencies"
+      - "ci"

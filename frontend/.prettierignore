@@ -1,0 +1,9 @@
+dist
+node_modules
+package-lock.json
+auto-imports.d.ts
+components.d.ts
+*.min.js
+*.min.css
+# vite 缓存文件（HMR/build 时生成，不入库）
+vite.config.js.timestamp-*.mjs
