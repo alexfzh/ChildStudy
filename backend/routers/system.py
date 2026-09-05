@@ -45,8 +45,8 @@ class UpgradeLog(BaseModel):
 
 
 # 当前版本（手动 bump，对应前端 package.json version）
-CURRENT_VERSION = "1.8.1"
-BUILD_TIME = "2026-09-03"
+CURRENT_VERSION = "1.9.0"
+BUILD_TIME = "2026-09-05"
 
 # 全量升级历史存在 data/upgrade_log.json（不提交 git，部署端自动积累）
 _LOG_FILE = Path(__file__).resolve().parent.parent / "data" / "upgrade_log.json"
@@ -129,6 +129,13 @@ _SEED_LOG = [
         "to_version": "1.8.1",
         "status": "success",
         "detail": "新增生长发育模块 v2: 身高/体重/BMI 曲线图(echarts/core 模块化, value 月龄轴, P3/P50/P97 红黄绿虚线参考带, 月↔岁换算修复) + 中国儿童生长标准库(WS/T 423-2022 身高体重 0-83月5档 & 7-18岁3档, WS/T 586-2018 BMI 0-83月 + 6-18岁超重/肥胖界值) + Child.gender 字段 + 详细对比总表(修表头错位补'孩子'/体重P97列, 分组表头) + BMI 自动计算与儿童身体状态卡(thin/normal/overweight/obese 评估+建议) + /api/growth/standards 公开接口 + 页面对比照表与 4 项数据卡 + 悬停行高亮 + 页面美化 + deploy.ps1/package.ps1 Windows 一键部署脚本 + 整岁/月龄标准对照查询. ruff 全过 (v1.8.1).",
+    },
+    {
+        "timestamp": "2026-09-05T11:00:00",
+        "from_version": "1.8.1",
+        "to_version": "1.9.0",
+        "status": "success",
+        "detail": "生长发育标准大复核 + BMI 消瘦界: 标准数据对照官方 PDF 逐项修正(0-83月体重P50 修正约7kg偏差 / 7-18岁男 13-18岁身高上修4-7cm / 标准号 WS/T 611→WS/T 612 / 7-18岁体重标注九城市2009非国标) + 7-18岁身高 3档→5档(P3/P15/P50/P85/P97, WS/T 612-2018 SD法) + BMI 消瘦界接入 WS/T 456-2014(6-18岁每半岁[中重度,轻度]切点, 后端 assess_bmi 偏瘦/中重度消瘦分级 + 前端曲线'消瘦界'参考线 + 说明卡扩 severe_thin/thin) + /api/growth/standards schema_version 3 + 体重曲线 tooltip 修复(axisPointer snap + emphasis + 鲁棒 formatter) + 详细对比总表简化为 P3/P50/P97 三档并移除备注列 + AIReports.vue @click 多语句反模式修复. 新增消瘦测试4个, pytest 255 passed (v1.9.0).",
     },
 ]
 
