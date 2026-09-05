@@ -63,6 +63,44 @@ def test_bmi_cutoff_table_consistency():
             assert vals[0] < vals[1], f"{g} {age_str}: overweight >= obesity"
 
 
+def test_bmi_thin_cutoff_table_consistency():
+    # WS/T 456-2014: [中重度消瘦界, 轻度消瘦界]，且轻度上限须低于超重界
+    from utils.growth_standards import BMI_THIN_CUTOFFS_6_18
+
+    for g in ("male", "female"):
+        assert set(BMI_THIN_CUTOFFS_6_18[g].keys()) == set(BMI_CUTOFFS_6_18[g].keys())
+        for age_str, vals in BMI_THIN_CUTOFFS_6_18[g].items():
+            assert len(vals) == 2
+            assert vals[0] < vals[1], f"{g} {age_str}: severe >= mild thin cutoff"
+            assert vals[1] < BMI_CUTOFFS_6_18[g][age_str][0], (
+                f"{g} {age_str}: mild thin cutoff >= overweight cutoff"
+            )
+
+
+# ---- assess_bmi 消瘦 (WS/T 456-2014) ----
+def test_bmi_thin_male_10y():
+    # 10.0 岁男: 中重度=13.9, 轻度=14.4；14.2 落在轻度消瘦区间
+    r = assess_bmi(14.2, "male", 120)
+    assert r["category"] == "thin"
+    assert r["label"] == "偏瘦（轻度消瘦）"
+    assert r["color"] == "info"
+    assert r["thin_cutoff"] == [13.9, 14.4]
+
+
+def test_bmi_severe_thin_male_10y():
+    # 10.0 岁男: 13.5 ≤ 中重度界 13.9 → 中重度消瘦
+    r = assess_bmi(13.5, "male", 120)
+    assert r["category"] == "severe_thin"
+    assert r["label"] == "中重度消瘦"
+    assert r["color"] == "danger"
+
+
+def test_bmi_thin_boundary_male_10y():
+    # 边界：BMI == 轻度消瘦上限 → 偏瘦；略高于上限 → 正常
+    assert assess_bmi(14.4, "male", 120)["category"] == "thin"
+    assert assess_bmi(14.5, "male", 120)["category"] == "normal"
+
+
 # ---- assess_height (0-83 月) ----
 def test_height_male_6m():
     # 6 月男: P3=64.2, P15≈65.85, P50=68.7, P85≈71.45, P97=73.2
@@ -87,10 +125,11 @@ def test_height_female_3y():
 def test_standards_direct():
     from routers.growth import get_standards
     data = get_standards()
-    # 2026-09-05 复核后 schema_version 升到 2（标注 WS/T 612 + 7-18 岁体重非国标）
-    assert data["schema_version"] == 2
+    # 2026-09-05 复核后 schema_version 升到 3（加 WS/T 456-2014 消瘦界）
+    assert data["schema_version"] == 3
     assert "height_0_83_months" in data
     assert "bmi_cutoffs_6_18" in data
+    assert "bmi_thin_cutoffs_6_18" in data
     assert "bmi_0_83_months" in data
     assert "male" in data["height_0_83_months"]
     assert len(data["height_0_83_months"]["male"]) == 84

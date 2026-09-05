@@ -132,29 +132,33 @@ async def health():
 # 生长发育标准数据（公开，不涉及隐私）
 # 2026-09-05 复核：标准号 WS/T 611 → WS/T 612（错误修正），并明确标注
 # 7-18 岁体重沿用九城市儿童体格发育调查 (2009)，国内暂无对应国标。
+# 2026-09-05 加 WS/T 456-2014 6-18 岁消瘦界（用于 BMI 偏瘦判断 + 曲线参考）。
 @app.get("/api/growth/standards")
 async def public_growth_standards():
     from utils.growth_assessor import get_standard_description
     from utils.growth_standards import (
         BMI_0_83,
         BMI_CUTOFFS_6_18,
+        BMI_THIN_CUTOFFS_6_18,
         HEIGHT_0_83,
         HEIGHT_7_18,
         WEIGHT_0_83,
         WEIGHT_7_18,
     )
     return {
-        "schema_version": 2,  # 2026-09-05: 标注 WS/T 612 + 7-18 岁体重非国标
+        "schema_version": 3,  # 2026-09-05: 加 WS/T 456-2014 6-18 岁消瘦界
         "sources": [
             "WS/T 423-2022 (0-7 岁 身高/体重/BMI 百分位) — 国家标准",
             "WS/T 612-2018 (7-18 岁 身高发育等级评价, SD 法) — 国家标准",
             "WS/T 586-2018 (6-18 岁 BMI 超重/肥胖切点) — 国家标准",
+            "WS/T 456-2014 (6-18 岁 BMI 消瘦界值) — 国家标准",
             "7-18 岁 体重 P3/P50/P97 — 九城市儿童体格发育调查 (2009), 非国标, 参考",
         ],
         "height_0_83_months": HEIGHT_0_83,
         "weight_0_83_months": WEIGHT_0_83,
         "bmi_0_83_months": BMI_0_83,
         "bmi_cutoffs_6_18": BMI_CUTOFFS_6_18,
+        "bmi_thin_cutoffs_6_18": BMI_THIN_CUTOFFS_6_18,
         "height_7_18_years": HEIGHT_7_18,
         "weight_7_18_years": WEIGHT_7_18,
         "description": get_standard_description(),

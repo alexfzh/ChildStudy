@@ -10,6 +10,7 @@ from typing import Literal
 from .growth_standards import (
     BMI_0_83,
     BMI_CUTOFFS_6_18,
+    BMI_THIN_CUTOFFS_6_18,
     HEIGHT_0_83,
     HEIGHT_7_18,
     WEIGHT_0_83,
@@ -240,9 +241,13 @@ def assess_bmi(bmi: float | None, gender: Gender, age_months: int | None) -> dic
             "percentile": pct,
         }
     elif age_months <= 216:
-        # 6-18 岁: WS/T 586-2018 超重/肥胖切点
+        # 6-18 岁: WS/T 586-2018 超重/肥胖 + WS/T 456-2014 消瘦
+        # 完整分级:
+        #   中重度消瘦 (BMI ≤ thin[0]) / 轻度消瘦 (thin[0] < BMI ≤ thin[1]) /
+        #   正常 (thin[1] < BMI < ow) / 超重 (ow ≤ BMI < ob) / 肥胖 (BMI ≥ ob)
         age_str = str(round(age_months / 12 * 2) / 2)  # nearest 0.5
         cutoff = BMI_CUTOFFS_6_18.get(gender, {}).get(age_str)
+        thin = BMI_THIN_CUTOFFS_6_18.get(gender, {}).get(age_str)
         if not cutoff:
             return {"category": "unknown", "label": "-", "color": "default", "cutoff": None, "source": "-"}
         ow, ob = cutoff
@@ -250,9 +255,22 @@ def assess_bmi(bmi: float | None, gender: Gender, age_months: int | None) -> dic
             cat, label, color = "obese", "肥胖", "danger"
         elif b >= ow:
             cat, label, color = "overweight", "超重", "warning"
+        elif thin and b <= thin[1]:
+            # WS/T 456-2014 轻度 / 中重度消瘦
+            if b <= thin[0]:
+                cat, label, color = "severe_thin", "中重度消瘦", "danger"
+            else:
+                cat, label, color = "thin", "偏瘦（轻度消瘦）", "info"
         else:
             cat, label, color = "normal", "正常", "success"
-        return {"category": cat, "label": label, "color": color, "cutoff": cutoff, "source": "WS/T 586-2018"}
+        return {
+            "category": cat,
+            "label": label,
+            "color": color,
+            "cutoff": cutoff,
+            "thin_cutoff": thin,
+            "source": "WS/T 586-2018（超重肥胖） + WS/T 456-2014（消瘦）",
+        }
     else:
         return {"category": "unknown", "label": "-", "color": "default", "cutoff": None, "source": "-"}
 
@@ -282,12 +300,15 @@ def get_standard_description() -> dict:
             ),
         },
         "cn_6_18": {
-            "title": "6-18 岁（WS/T 586-2018）",
+            "title": "6-18 岁（WS/T 586-2018 + WS/T 456-2014）",
             "desc": (
-                "采用性别年龄别 BMI 切点。超重 = BMI ≥ 超重界值且 < 肥胖界值；"
-                "肥胖 = BMI ≥ 肥胖界值。"
+                "WS/T 586-2018 给 BMI 超重/肥胖切点；WS/T 456-2014 给 BMI 消瘦切点。"
+                "分级：BMI ≤ 中重度消瘦界 → 中重度消瘦；"
+                "BMI ≤ 轻度消瘦界 → 偏瘦（轻度消瘦）；"
+                "正常 = 消瘦界 < BMI < 超重界；超重 / 肥胖 见 WS/T 586-2018。"
             ),
             "cutoffs": BMI_CUTOFFS_6_18,
+            "thin_cutoffs": BMI_THIN_CUTOFFS_6_18,
         },
         "cn_height_7_18": {
             "title": "7-18 岁身高（WS/T 612-2018）",

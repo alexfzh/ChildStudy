@@ -46,12 +46,20 @@ const bmiColorClass = computed(() => {
     unknown: "text-slate-400 bg-slate-50",
     approximate: "text-indigo-600 bg-indigo-50",
     thin: "text-sky-600 bg-sky-50",
+    severe_thin: "text-rose-600 bg-rose-50",
   }
   return map[bmiAssessment.value.category] || "text-slate-400 bg-slate-50"
 })
 
 // BMI 身体状态说明（儿童口径：阈值随年龄/性别由标准表自动判定，非成人固定数值）
 const bmiAdvice = {
+  severe_thin: {
+    title: "中重度消瘦",
+    tone: "text-rose-700",
+    bg: "bg-rose-50 border-rose-200",
+    desc: "BMI 已低于中重度消瘦界，属于营养不良筛查阳性，需高度重视。",
+    advice: "建议尽早就诊儿科 / 营养科，排查疾病与膳食摄入问题，在专业指导下制定营养干预方案。",
+  },
   thin: {
     title: "偏瘦",
     tone: "text-sky-700",
@@ -502,7 +510,8 @@ function renderCharts() {
 
   // ---- BMI 曲线 ----
   // 参考线分两套：<7岁用 BMI_0_83 的 P3/P50/P97（WS/T 423）；≥7岁用 BMI_CUTOFFS_6_18 的
-  // 超重/肥胖界值（WS/T 586，无 BMI 百分位常模，仅给警示界）。窗口内逐月取对应参考。
+  // 超重/肥胖界值（WS/T 586）+ BMI_THIN_CUTOFFS_6_18 消瘦界（WS/T 456-2014，取轻度消瘦上限）。
+  // 窗口内逐月取对应参考。
   const bmiRefAt = (month) => {
     if (month <= 83) {
       const row = standards.value.bmi_0_83_months?.[g]?.[String(month)]
@@ -519,9 +528,12 @@ function renderCharts() {
     const yr = month / 12
     const nearest = keys.reduce((p, c) => (Math.abs(c - yr) < Math.abs(p - yr) ? c : p))
     const row = table[String(nearest)]
-    return row ? { kind: "cut", ow: row[0], ob: row[1] } : null
+    if (!row) return null
+    // WS/T 456-2014: [中重度消瘦界, 轻度消瘦界]，曲线只画轻度消瘦上限（偏瘦分界）
+    const thinRow = standards.value.bmi_thin_cutoffs_6_18?.[g]?.[String(nearest)]
+    return { kind: "cut", ow: row[0], ob: row[1], thin: thinRow ? thinRow[1] : null }
   }
-  const bmiBands = { P3: [], P50: [], P97: [], 超重: [], 肥胖: [] }
+  const bmiBands = { P3: [], P50: [], P97: [], 消瘦: [], 超重: [], 肥胖: [] }
   for (let m = axisMin; m <= axisMax; m++) {
     const r = bmiRefAt(m)
     if (!r) continue
@@ -530,6 +542,7 @@ function renderCharts() {
       bmiBands.P50.push([m, r.p50])
       bmiBands.P97.push([m, r.p97])
     } else {
+      if (r.thin != null) bmiBands.消瘦.push([m, r.thin])
       bmiBands.超重.push([m, r.ow])
       bmiBands.肥胖.push([m, r.ob])
     }
@@ -538,10 +551,11 @@ function renderCharts() {
     P3: { color: "#ef4444", ls: "dashed" },
     P50: { color: "#eab308", ls: "dashed" },
     P97: { color: "#22c55e", ls: "dashed" },
+    消瘦: { color: "#0ea5e9", ls: "dashed" },
     超重: { color: "#f59e0b", ls: "dashed" },
     肥胖: { color: "#dc2626", ls: "dashed" },
   }
-  const bmiBandList = ["P3", "P50", "P97", "超重", "肥胖"]
+  const bmiBandList = ["P3", "P50", "P97", "消瘦", "超重", "肥胖"]
     .map((name) =>
       bmiBands[name].length
         ? { name, data: bmiBands[name], color: bmiStyle[name].color, lineStyle: bmiStyle[name].ls }
@@ -1015,7 +1029,11 @@ function tagClass(color) {
               肥胖界
               <span class="font-mono font-medium">{{ currentBmiInfo.assessment.cutoff[1] }}</span>
             </template>
-            <span v-else>（百分位法，阈值随年龄/性别自动判定）</span>
+            <template v-if="currentBmiInfo.assessment.thinCutoff">
+              · 消瘦界（轻度上限）
+              <span class="font-mono font-medium">{{ currentBmiInfo.assessment.thinCutoff[1] }}</span>
+            </template>
+            <span v-if="!currentBmiInfo.assessment.cutoff">（百分位法，阈值随年龄/性别自动判定）</span>
           </p>
         </div>
       </div>

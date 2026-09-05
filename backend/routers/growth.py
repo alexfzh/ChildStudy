@@ -19,6 +19,7 @@ from utils.growth_assessor import (
 from utils.growth_standards import (
     BMI_0_83,
     BMI_CUTOFFS_6_18,
+    BMI_THIN_CUTOFFS_6_18,
     HEIGHT_0_83,
     HEIGHT_7_18,
     WEIGHT_0_83,
@@ -43,17 +44,19 @@ def get_standards():
     Note: WHO data is not yet implemented (future enhancement).
     """
     return {
-        "schema_version": 2,  # 2026-09-05: 标注 WS/T 612 + 7-18 岁体重非国标
+        "schema_version": 3,  # 2026-09-05: 加 WS/T 456-2014 6-18 岁消瘦界
         "sources": [
             "WS/T 423-2022 (0-7 岁 身高/体重/BMI 百分位) — 国家标准",
             "WS/T 612-2018 (7-18 岁 身高发育等级评价, SD 法) — 国家标准",
             "WS/T 586-2018 (6-18 岁 BMI 超重/肥胖切点) — 国家标准",
+            "WS/T 456-2014 (6-18 岁 BMI 消瘦界值) — 国家标准",
             "7-18 岁 体重 P3/P50/P97 — 九城市儿童体格发育调查 (2009), 非国标, 参考",
         ],
         "height_0_83_months": HEIGHT_0_83,  # type: ignore[return-value]
         "weight_0_83_months": WEIGHT_0_83,  # type: ignore[return-value]
         "bmi_0_83_months": BMI_0_83,  # type: ignore[return-value]
         "bmi_cutoffs_6_18": BMI_CUTOFFS_6_18,  # type: ignore[return-value]
+        "bmi_thin_cutoffs_6_18": BMI_THIN_CUTOFFS_6_18,  # type: ignore[return-value]
         "height_7_18_years": HEIGHT_7_18,  # type: ignore[return-value]
         "weight_7_18_years": WEIGHT_7_18,  # type: ignore[return-value]
         "description": get_standard_description(),
