@@ -1,59 +1,17 @@
 [
   {
-    "timestamp": "2026-08-28T11:30:00",
-    "from_version": "1.1.0",
-    "to_version": "1.2.0",
+    "timestamp": "2026-09-05T04:04:15.796846+00:00",
+    "from_version": "1.8.1",
+    "to_version": "1.9.0",
     "status": "success",
-    "detail": "新增: 教材章节系统 + Question-KP 关联 + KPStudyProgress"
+    "detail": "生长发育标准大复核 + BMI 消瘦界: 标准数据对照官方 PDF 逐项修正(0-83月体重P50 修正约7kg偏差 / 7-18岁男 13-18岁身高上修4-7cm / 标准号 WS/T 611→WS/T 612 / 7-18岁体重标注九城市2009非国标) + 7-18岁身高 3档→5档(P3/P15/P50/P85/P97, WS/T 612-2018 SD法) + BMI 消瘦界接入 WS/T 456-2014(6-18岁每半岁[中重度,轻度]切点, 后端 assess_bmi 偏瘦/中重度消瘦分级 + 前端曲线消瘦界参考线 + 说明卡扩 severe_thin/thin) + /api/growth/standards schema_version 3 + 体重曲线 tooltip 修复(axisPointer snap + emphasis + 鲁棒 formatter) + 详细对比总表简化为 P3/P50/P97 三档并移除备注列 + AIReports.vue @click 多语句反模式修复. 新增消瘦测试4个, pytest 255 passed (v1.9.0)."
   },
   {
-    "timestamp": "2026-08-31T11:23:00",
-    "from_version": "1.2.0",
-    "to_version": "1.3.0",
+    "timestamp": "2026-09-03T13:00:00",
+    "from_version": "1.7.3",
+    "to_version": "1.8.0",
     "status": "success",
-    "detail": "新增: 错题本智能关联题库与知识点（多信号匹配引擎）+ 答题自动归错题本 + python-multipart CVE-2026-24486 修复 + 后端依赖升级 (fastapi 0.115 → 0.141, starlette 1.6)"
-  },
-  {
-    "timestamp": "2026-08-31T11:48:00",
-    "from_version": "1.3.0",
-    "to_version": "1.4.0",
-    "status": "success",
-    "detail": "新增: 考试分析模块 (单科单次总分分析 + 历次趋势 + 卷面分析). 新建 ExamQuestion 表 + 9 种题型枚举 + AI 整卷录入接口 (paper_total_score 校验). utils/exam_analyzer.py 单测 25 个全过."
-  },
-  {
-    "timestamp": "2026-08-31T14:30:00",
-    "from_version": "1.4.0",
-    "to_version": "1.5.0",
-    "status": "success",
-    "detail": "新增: exercises 练习耗时 time_spent 记录 + 练习页计时器 + 知识点筛选预加载 + 题目进度色块导航 + some/any 17 题入库并关联 U1 单元 + 修正 coffee 疑问句答案/解析 + 清理临时文件."
-  },
-  {
-    "timestamp": "2026-09-01T10:50:00",
-    "from_version": "1.5.0",
-    "to_version": "1.6.0",
-    "status": "success",
-    "detail": "新增: 家庭成员多用户登录 (家长/孩子账号 + JWT 认证 + 家庭数据隔离 + 孩子 scope 过滤 + LAN 访问)."
-  },
-  {
-    "timestamp": "2026-09-01T16:50:00",
-    "from_version": "1.6.0",
-    "to_version": "1.7.0",
-    "status": "success",
-    "detail": "新增: 错题推荐对接新知识点体系(QuestionKnowledgePoint多对多 + KP↔Unit 三层去重: primary主KP / unit_extend同Unit拓展 / kp_name_fallback字符串兜底). 孩子端看板(ChildDashboard)+ bootstrapChild自举 + 修改密码(/api/auth/change-password + Settings) + 路由守卫tokenValidated校验 + 全局错误兜底(errorHandler + unhandledrejection) + JWT_SECRET轮换 + 端口8000回归修复 + 匿名写knowledge-points/rewards补require_parent + vite build配置修复(v1.7.0)."
-  },
-  {
-    "timestamp": "2026-09-02T15:00:00",
-    "from_version": "1.7.0",
-    "to_version": "1.7.1",
-    "status": "success",
-    "detail": "安全加固: 登录防爆破限流(来源IP连续失败N次临时锁定返回429, 默认5次/15分钟, .env 可配 LOGIN_MAX_FAILURES/LOGIN_LOCK_MINUTES) + 登录成功/失败/锁定日志留痕(含来源IP). 面向公网无 HTTPS 部署的安全增强(v1.7.1)."
-  },
-  {
-    "timestamp": "2026-09-02T21:00:00",
-    "from_version": "1.7.1",
-    "to_version": "1.7.2",
-    "status": "success",
-    "detail": "hotfix + 审计加固: dependencies.py B904 修复 (raise ... from err) + auth.py/rewards.py import sort + test_auth.py 新增 29 个用例 (登录/防爆破/改密/JWT/角色守卫/范围隔离/setup/安全工具) 覆盖 v1.7.0-v1.7.1 安全关键路径 + frontend audit:routes 脚本 (路由 meta 校验) + README 新增部署安全须知章节 (单 worker / JWT secret rotation / CORS 不要 credentials / 端口暴露策略) + ruff check 全过 (v1.7.2)."
+    "detail": "安全审计闭环 + 性能优化: JWT 占位密钥 fail-fast 拒绝启动 + 服务端令牌吊销(RevokedToken/jti, logout 真吊销) + AIReports XSS 链接转义 + /uploads 静态挂载与鉴权图片端点 + 考试创建自动发积分(grant_exam_reward 幂等) + 版本接口去 DB 绝对路径 + IP 限流中间件 + /api/system/metrics + 列表 offset 分页 + SQLite 自动备份脚本 + Caddy HTTPS 部署模板 + 跨平台 CI(ruff/pytest/schema-router/前端 build+路由审计) + element-plus 按需引入(938KB 单包消除) + 8 组 N+1 批量预取 + router CRUD 测试补齐(children/timeline/project_works/question_banks/dashboard) + seeds 迁移 scripts/seed + Alembic 迁移骨架. ruff 全过, pytest 229 passed (v1.8.0)."
   },
   {
     "timestamp": "2026-09-02T21:15:00",
@@ -63,10 +21,59 @@
     "detail": "hotfix: 修复 GrowthRecord / SocialEmotional / Interest 三条 POST /:child_id 路由 422 bug — schemas.py 三个 Base schema 中 child_id 改为 Optional[int] = None (原 int 必填与 router 从路径注入冲突, 前端表单不传 child_id). 新增 test_growth_create.py 8 个测试覆盖三种 record + 兼容性 + 范围守卫. ruff + pytest 168 passed (v1.7.3)."
   },
   {
-    "timestamp": "2026-09-03T13:00:00",
-    "from_version": "1.7.3",
-    "to_version": "1.8.0",
+    "timestamp": "2026-09-02T21:00:00",
+    "from_version": "1.7.1",
+    "to_version": "1.7.2",
     "status": "success",
-    "detail": "安全审计闭环 + 性能优化: JWT 占位密钥 fail-fast 拒绝启动 + 服务端令牌吊销(RevokedToken/jti, logout 真吊销) + AIReports XSS 链接转义 + /uploads 静态挂载与鉴权图片端点 + 考试创建自动发积分(grant_exam_reward 幂等) + 版本接口去 DB 绝对路径 + IP 限流中间件 + /api/system/metrics + 列表 offset 分页 + SQLite 自动备份脚本 + Caddy HTTPS 部署模板 + 跨平台 CI(ruff/pytest/schema-router/前端 build+路由审计) + element-plus 按需引入(938KB 单包消除) + 8 组 N+1 批量预取 + router CRUD 测试补齐(children/timeline/project_works/question_banks/dashboard) + seeds 迁移 scripts/seed + Alembic 迁移骨架. ruff 全过, pytest 229 passed (v1.8.0)."
+    "detail": "hotfix + 审计加固: dependencies.py B904 修复 (raise ... from err) + auth.py/rewards.py import sort + test_auth.py 新增 29 个用例 (登录/防爆破/改密/JWT/角色守卫/范围隔离/setup/安全工具) 覆盖 v1.7.0-v1.7.1 安全关键路径 + frontend audit:routes 脚本 (路由 meta 校验) + README 新增部署安全须知章节 (单 worker / JWT secret rotation / CORS 不要 credentials / 端口暴露策略) + ruff check 全过 (v1.7.2)."
+  },
+  {
+    "timestamp": "2026-09-02T15:00:00",
+    "from_version": "1.7.0",
+    "to_version": "1.7.1",
+    "status": "success",
+    "detail": "安全加固: 登录防爆破限流(来源IP连续失败N次临时锁定返回429, 默认5次/15分钟, .env 可配 LOGIN_MAX_FAILURES/LOGIN_LOCK_MINUTES) + 登录成功/失败/锁定日志留痕(含来源IP). 面向公网无 HTTPS 部署的安全增强(v1.7.1)."
+  },
+  {
+    "timestamp": "2026-09-01T16:50:00",
+    "from_version": "1.6.0",
+    "to_version": "1.7.0",
+    "status": "success",
+    "detail": "新增: 错题推荐对接新知识点体系(QuestionKnowledgePoint多对多 + KP↔Unit 三层去重: primary主KP / unit_extend同Unit拓展 / kp_name_fallback字符串兜底). 孩子端看板(ChildDashboard)+ bootstrapChild自举 + 修改密码(/api/auth/change-password + Settings) + 路由守卫tokenValidated校验 + 全局错误兜底(errorHandler + unhandledrejection) + JWT_SECRET轮换 + 端口8000回归修复 + 匿名写knowledge-points/rewards补require_parent + vite build配置修复(v1.7.0)."
+  },
+  {
+    "timestamp": "2026-09-01T10:50:00",
+    "from_version": "1.5.0",
+    "to_version": "1.6.0",
+    "status": "success",
+    "detail": "新增: 家庭成员多用户登录 (家长/孩子账号 + JWT 认证 + 家庭数据隔离 + 孩子 scope 过滤 + LAN 访问)."
+  },
+  {
+    "timestamp": "2026-08-31T14:30:00",
+    "from_version": "1.4.0",
+    "to_version": "1.5.0",
+    "status": "success",
+    "detail": "新增: exercises 练习耗时 time_spent 记录 + 练习页计时器 + 知识点筛选预加载 + 题目进度色块导航 + some/any 17 题入库并关联 U1 单元 + 修正 coffee 疑问句答案/解析 + 清理临时文件."
+  },
+  {
+    "timestamp": "2026-08-31T11:48:00",
+    "from_version": "1.3.0",
+    "to_version": "1.4.0",
+    "status": "success",
+    "detail": "新增: 考试分析模块 (单科单次总分分析 + 历次趋势 + 卷面分析). 新建 ExamQuestion 表 + 9 种题型枚举 + AI 整卷录入接口 (paper_total_score 校验). utils/exam_analyzer.py 单测 25 个全过."
+  },
+  {
+    "timestamp": "2026-08-31T11:23:00",
+    "from_version": "1.2.0",
+    "to_version": "1.3.0",
+    "status": "success",
+    "detail": "新增: 错题本智能关联题库与知识点（多信号匹配引擎）+ 答题自动归错题本 + python-multipart CVE-2026-24486 修复 + 后端依赖升级 (fastapi 0.115 → 0.141, starlette 1.6)"
+  },
+  {
+    "timestamp": "2026-08-28T11:30:00",
+    "from_version": "1.1.0",
+    "to_version": "1.2.0",
+    "status": "success",
+    "detail": "新增: 教材章节系统 + Question-KP 关联 + KPStudyProgress"
   }
 ]
