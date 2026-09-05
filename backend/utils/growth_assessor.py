@@ -97,13 +97,41 @@ def _lookup_0_83(
 def _lookup_7_18(
     gender: Gender, age_years: float, value: float, table: dict
 ) -> tuple[str, float | None]:
-    """Locate percentile for 7-18 year table (P3/P50/P97)."""
+    """Locate percentile for 7-18 year table.
+
+    表的列格式：
+    - 5 档 (P3/P15/P50/P85/P97，对应 WS/T 612-2018 SD 法 -2SD/-1SD/中位/+1SD/+2SD)：
+      下(<P3) / 中下(P3-P15) / 中(P15-P85) / 中上(P85-P97) / 上(≥P97)
+    - 3 档 (P3/P50/P97，旧格式)：下(<P3) / 中下(P3-P50) / 中上(P50-P97) / 上(≥P97)
+    """
     yr = int(age_years)
     if yr < 7 or yr > 18:
         return ("unknown", None)
     row = table.get(gender, {}).get(yr)
     if not row:
         return ("unknown", None)
+    if len(row) >= 5:
+        p3, p15, p50, p85, p97 = row
+        if value < p3:
+            return ("down", None)
+        if value <= p15:
+            est = 3 + (value - p3) / (p15 - p3) * 12 if p15 > p3 else 3
+            return ("mid_down", round(est, 1))
+        if value <= p85:
+            # P15-P85 占整体约 70% (15.9→84.1)，按比例估
+            if p85 > p15:
+                est = 15 + (value - p15) / (p85 - p15) * 70
+            else:
+                est = 15
+            return ("mid", round(est, 1))
+        if value <= p97:
+            if p97 > p85:
+                est = 85 + (value - p85) / (p97 - p85) * 12
+            else:
+                est = 85
+            return ("mid_up", round(est, 1))
+        return ("up", 97.0)
+    # 3 档兼容（保留旧数据形态）
     p3, p50, p97 = row
     if value < p3:
         return ("down", None)
@@ -140,9 +168,9 @@ def assess_height(height_cm: float | None, gender: Gender, age_months: int | Non
         return {"category": "unknown", "label": "-", "percentile": None, "source": "-"}
     labels = {
         "down": "下（<P3）",
-        "mid_down": "中下",
-        "mid": "中",
-        "mid_up": "中上",
+        "mid_down": "中下（P3-P15）",
+        "mid": "中（P15-P85）",
+        "mid_up": "中上（P85-P97）",
         "up": "上（≥P97）",
         "unknown": "-",
     }
@@ -164,6 +192,7 @@ def assess_weight(weight_kg: float | None, gender: Gender, age_months: int | Non
         # 7-18 岁体重国内无统一国标（WS/T 612-2018 仅覆盖身高），
         # 当前数据沿用首都儿科研究所九城市儿童体格发育调查 (2009)，
         # 仅作参考，应结合 BMI 切点（WS/T 586-2018）与医生评估综合判断。
+        # 该调查表本身只给 P3/P50/P97 三档，分类粗一些。
         src = "九城市儿童体格发育调查 2009（非国标，参考）"
     else:
         return {"category": "unknown", "label": "-", "percentile": None, "source": "-"}
@@ -263,8 +292,9 @@ def get_standard_description() -> dict:
         "cn_height_7_18": {
             "title": "7-18 岁身高（WS/T 612-2018）",
             "desc": (
-                "采用 SD 法（-2SD / 中位数 / +2SD），系统近似展示为 [P3, P50, P97]。"
-                "<P3 为下，P3-P50 为下中，P50-P97 为中上，≥P97 为上。"
+                "采用 SD 法（-2SD / -1SD / 中位数 / +1SD / +2SD），系统近似展示为"
+                " [P3, P15, P50, P85, P97]。"
+                "<P3 为下，P3-P15 为中下，P15-P85 为中，P85-P97 为中上，≥P97 为上。"
             ),
         },
         "cn_weight_7_18": {

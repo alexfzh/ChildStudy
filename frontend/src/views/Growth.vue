@@ -131,15 +131,18 @@ function weightStdRow(months) {
 function categoryByRange(value, std) {
   if (!std || value == null) return { label: "-", color: "default" }
   const hasFive = std.p15 != null
-  const p3 = std.p3
-  const p97 = std.p97
-  const p50 = std.p50
+  const { p3, p50, p97 } = std
   if (value < p3) return { label: "下（<P3）", color: "info" }
-  if (hasFive && value < std.p15) return { label: "中下", color: "slate" }
-  if (value < p50) return { label: "中下", color: "slate" }
-  if (value <= p50) return { label: "中位数", color: "success" }
-  if (hasFive && value <= std.p85) return { label: "中上", color: "success" }
-  if (value <= p97) return { label: "中上", color: "success" }
+  if (hasFive) {
+    // 5 档：P3 / P15 / P50 / P85 / P97
+    if (value <= std.p15) return { label: "中下", color: "slate" }
+    if (value <= std.p85) return { label: "中", color: "success" }
+    if (value <= p97) return { label: "中上", color: "success" }
+  } else {
+    // 3 档兼容（旧数据 / 7-18 岁体重非国标）：P3 / P50 / P97
+    if (value <= p50) return { label: "中下", color: "slate" }
+    if (value <= p97) return { label: "中上", color: "success" }
+  }
   return { label: "上（≥P97）", color: "warning" }
 }
 
@@ -210,29 +213,54 @@ const enrichedRecords = computed(() => {
 })
 
 // ---------- 整岁对照表 ----------
+// 2026-09-05：身高升级 5 档 (P3/P15/P50/P85/P97) 后，
+//   输出结构统一为 height/weight 对象带显式分档字段名，
+//   模板按字段访问避免 [1]/[2] 这种与档数耦合的索引。
 const yearlyStandards = computed(() => {
   if (!standards.value) return []
   const g = childGender.value
   const out = []
   const h0 = standards.value.height_0_83_months?.[g] || {}
   const w0 = standards.value.weight_0_83_months?.[g] || {}
+  const h7 = standards.value.height_7_18_years?.[g] || {}
+  const w7 = standards.value.weight_7_18_years?.[g] || {}
+  const _hRow = (row) => {
+    // row: [P3, P15, P50, P85, P97] 或 [P3, P50, P97]
+    if (!row) return { p3: null, p15: null, p50: null, p85: null, p97: null }
+    return {
+      p3: row[0],
+      p15: row.length >= 5 ? row[1] : null,
+      p50: row.length >= 5 ? row[2] : row[1],
+      p85: row.length >= 5 ? row[3] : null,
+      p97: row.length >= 5 ? row[4] : row[2],
+    }
+  }
+  const _wRow = _hRow
   const infantMonths = [0, 12, 24, 36, 48, 60, 72, 84]
   for (const m of infantMonths) {
     if (h0[m]) {
       out.push({
         label: m === 0 ? "出生" : `${m / 12} 岁`,
         months: m,
-        height: h0[m],
-        weight: w0[m],
+        height: _hRow(h0[m]),
+        weight: _wRow(w0[m]),
         source: "WS/T 423",
+        heightCols: 5, // 0-83 月身高 5 档
+        weightCols: 5, // 0-83 月体重 5 档
       })
     }
   }
-  const h7 = standards.value.height_7_18_years?.[g] || {}
-  const w7 = standards.value.weight_7_18_years?.[g] || {}
   for (let y = 7; y <= 18; y++) {
     if (h7[y]) {
-      out.push({ label: `${y} 岁`, months: y * 12, height: h7[y], weight: w7[y], source: "WS/T 611" })
+      out.push({
+        label: `${y} 岁`,
+        months: y * 12,
+        height: _hRow(h7[y]),
+        weight: _wRow(w7[y]),
+        source: "WS/T 612",
+        heightCols: 5, // 7-18 岁身高 5 档（WS/T 612-2018 SD 法）
+        weightCols: 3, // 7-18 岁体重 3 档（国内非国标）
+      })
     }
   }
   return out
@@ -243,6 +271,15 @@ const currentMonthIndex = computed(() => {
   if (am == null) return -1
   return yearlyStandards.value.findIndex((r) => r.months === am)
 })
+
+// 是否有体重仅 3 档的行（7-18 岁体重沿用非国标数据）
+const hasThreeColWeight = computed(() =>
+  yearlyStandards.value.some((r) => r.weightCols === 3),
+)
+
+function rowHas3OnlyWeight(row) {
+  return row.weightCols === 3
+}
 
 // ---------- Charts ----------
 const chartRefHeight = ref(null)
@@ -344,10 +381,11 @@ function renderCharts() {
   const axisMax = lastMonth + 8
 
   /**
-   * 取指定月龄的标准 [P3, P50, P97]。
-   * 0-83 月走 WS/T 423（月表，P3/P15/P50/P85/P97 取 0/2/4）；
-   * 84 月以上走 WS/T 611（岁表，P3/P50/P97）——月龄必须 ÷12 换算成岁，
+   * 取指定月龄的标准 [P3, P15, P50, P85, P97]。
+   * 0-83 月走 WS/T 423-2022（月表，5 档）；
+   * 84 月以上走 WS/T 612-2018（岁表，5 档 SD 法）——月龄必须 ÷12 换算成岁，
    * 不能用月龄直接匹配岁的键（旧 bug）。
+   * 7-18 岁体重国内非国标，row 通常只 3 档：返回时 p15/p85 = null。
    */
   const stdTripletAt = (month) => {
     const h0 = standards.value.height_0_83_months?.[g]
@@ -363,8 +401,14 @@ function renderCharts() {
       const nearest = keys.reduce((p, c) => (Math.abs(c - want) < Math.abs(p - want) ? c : p))
       return table[nearest]
     }
-    const pick = (r) =>
-      !r ? null : r.length >= 5 ? { p3: r[0], p50: r[2], p97: r[4] } : { p3: r[0], p50: r[1], p97: r[2] }
+    const pick = (r) => {
+      if (!r) return null
+      if (r.length >= 5) {
+        return { p3: r[0], p15: r[1], p50: r[2], p85: r[3], p97: r[4] }
+      }
+      // 3 档（7-18 岁体重）：p15/p85 留 null
+      return { p3: r[0], p15: null, p50: r[1], p85: null, p97: r[2] }
+    }
     const isUnder7 = month <= 83
     return {
       height: pick(isUnder7 ? rowFor(h0, month) : rowFor(h7, month / 12)),
@@ -372,30 +416,36 @@ function renderCharts() {
     }
   }
 
-  // 覆盖窗口内逐月生成参考带（P3/P50/P97 各一条）
-  const heightBands = { P3: [], P50: [], P97: [] }
-  const weightBands = { P3: [], P50: [], P97: [] }
+  // 覆盖窗口内逐月生成参考带（P3/P15/P50/P85/P97 各一条；体重 7-18 岁只有 3 档）
+  const heightBands = { P3: [], P15: [], P50: [], P85: [], P97: [] }
+  const weightBands = { P3: [], P15: [], P50: [], P85: [], P97: [] }
   for (let m = axisMin; m <= axisMax; m++) {
     const t = stdTripletAt(m)
     if (t.height) {
       heightBands.P3.push([m, t.height.p3])
+      heightBands.P15.push([m, t.height.p15])
       heightBands.P50.push([m, t.height.p50])
+      heightBands.P85.push([m, t.height.p85])
       heightBands.P97.push([m, t.height.p97])
     }
     if (t.weight) {
       weightBands.P3.push([m, t.weight.p3])
+      weightBands.P15.push([m, t.weight.p15])
       weightBands.P50.push([m, t.weight.p50])
+      weightBands.P85.push([m, t.weight.p85])
       weightBands.P97.push([m, t.weight.p97])
     }
   }
-  // P3/P50/P97 参考线：语义色（低=红、中位=黄、上界=绿），全部虚线便于肉眼区分。
+  // 5 条参考线：低=红、次低=橙、中位=黄、次高=青绿、上=绿
   const bandStyle = {
-    P3: { color: "#ef4444", lineStyle: "dashed" },
+    P3:  { color: "#ef4444", lineStyle: "dashed" },
+    P15: { color: "#fb923c", lineStyle: "dashed" },
     P50: { color: "#eab308", lineStyle: "dashed" },
+    P85: { color: "#06b6d4", lineStyle: "dashed" },
     P97: { color: "#22c55e", lineStyle: "dashed" },
   }
   const toBands = (map) =>
-    ["P97", "P50", "P3"].map((name) => ({
+    ["P97", "P85", "P50", "P15", "P3"].map((name) => ({
       name,
       data: map[name],
       color: bandStyle[name].color,
@@ -597,7 +647,7 @@ function tagClass(color) {
         >
         <div>
           <h2 class="text-lg font-semibold text-slate-800 leading-tight">生长发育</h2>
-          <p class="text-xs text-slate-500 mt-0.5">记录身高、体重、BMI，对照中国儿童生长标准（WS/T 423 · WS/T 611）</p>
+          <p class="text-xs text-slate-500 mt-0.5">记录身高、体重、BMI，对照中国儿童生长标准（WS/T 423 · WS/T 612）</p>
         </div>
       </div>
       <button class="btn-primary" @click="openCreate">+ 添加记录</button>
@@ -620,13 +670,12 @@ function tagClass(color) {
           <span v-if="latestHeight" class="text-xs text-slate-400 font-medium">cm</span>
         </div>
         <div v-if="heightStandard && latestHeight" class="mt-2 pt-2 border-t border-slate-100">
-          <div class="flex items-center justify-between">
-            <div class="text-[11px] text-slate-400">
-              P50 参考 <span class="font-mono text-slate-600">{{ heightStandard.p50 }}</span>
-            </div>
-            <div v-if="heightVsStd" class="text-[11px] text-slate-400">
-              P97 <span class="font-mono text-slate-600">{{ heightStandard.p97 }}</span>
-            </div>
+          <div class="grid grid-cols-3 gap-x-2 gap-y-0.5">
+            <div class="text-[11px] text-slate-400">P3 <span class="font-mono text-slate-500">{{ heightStandard.p3 }}</span></div>
+            <div class="text-[11px] text-slate-400">P15 <span class="font-mono text-slate-500">{{ heightStandard.p15 ?? "—" }}</span></div>
+            <div class="text-[11px] text-slate-400">P50 <span class="font-mono text-slate-700 font-semibold">{{ heightStandard.p50 }}</span></div>
+            <div class="text-[11px] text-slate-400">P85 <span class="font-mono text-slate-500">{{ heightStandard.p85 ?? "—" }}</span></div>
+            <div class="text-[11px] text-slate-400 col-span-2">P97 <span class="font-mono text-slate-500">{{ heightStandard.p97 }}</span></div>
           </div>
           <div v-if="heightVsStd" class="mt-1.5">
             <span
@@ -652,13 +701,12 @@ function tagClass(color) {
           <span v-if="latestWeight" class="text-xs text-slate-400 font-medium">kg</span>
         </div>
         <div v-if="weightStandard && latestWeight" class="mt-2 pt-2 border-t border-slate-100">
-          <div class="flex items-center justify-between">
-            <div class="text-[11px] text-slate-400">
-              P50 参考 <span class="font-mono text-slate-600">{{ weightStandard.p50 }}</span>
-            </div>
-            <div class="text-[11px] text-slate-400">
-              P97 <span class="font-mono text-slate-600">{{ weightStandard.p97 }}</span>
-            </div>
+          <div class="grid grid-cols-3 gap-x-2 gap-y-0.5">
+            <div class="text-[11px] text-slate-400">P3 <span class="font-mono text-slate-500">{{ weightStandard.p3 }}</span></div>
+            <div class="text-[11px] text-slate-400">P15 <span class="font-mono text-slate-500">{{ weightStandard.p15 ?? "—" }}</span></div>
+            <div class="text-[11px] text-slate-400">P50 <span class="font-mono text-slate-700 font-semibold">{{ weightStandard.p50 }}</span></div>
+            <div class="text-[11px] text-slate-400">P85 <span class="font-mono text-slate-500">{{ weightStandard.p85 ?? "—" }}</span></div>
+            <div class="text-[11px] text-slate-400 col-span-2">P97 <span class="font-mono text-slate-500">{{ weightStandard.p97 }}</span></div>
           </div>
           <div v-if="weightVsStd" class="mt-1.5">
             <span
@@ -737,8 +785,8 @@ function tagClass(color) {
             <tr>
               <th class="text-left py-2 px-3 text-slate-500 font-medium bg-slate-50/60">日期</th>
               <th class="text-left py-2 px-3 text-slate-500 font-medium bg-slate-50/60">年龄</th>
-              <th class="text-right py-2 px-3 text-brand-700 font-semibold bg-brand-50/40" colspan="4">📏 身高 (cm)</th>
-              <th class="text-right py-2 px-3 text-emerald-700 font-semibold bg-emerald-50/40" colspan="4">
+              <th class="text-right py-2 px-3 text-brand-700 font-semibold bg-brand-50/40" colspan="6">📏 身高 (cm)</th>
+              <th class="text-right py-2 px-3 text-emerald-700 font-semibold bg-emerald-50/40" colspan="6">
                 ⚖️ 体重 (kg)
               </th>
               <th class="text-right py-2 px-3 text-slate-500 font-medium bg-slate-50/60">BMI</th>
@@ -752,11 +800,15 @@ function tagClass(color) {
               <th class="py-1 px-3 bg-slate-50/60"></th>
               <th class="text-right py-1 px-3 text-[11px] text-brand-700 font-bold bg-brand-50/40">孩子</th>
               <th class="text-right py-1 px-3 text-[11px] text-slate-400 bg-brand-50/40">P3</th>
+              <th class="text-right py-1 px-3 text-[11px] text-slate-500 bg-brand-50/40">P15</th>
               <th class="text-right py-1 px-3 text-[11px] text-slate-500 font-semibold bg-brand-50/40">P50</th>
+              <th class="text-right py-1 px-3 text-[11px] text-slate-500 bg-brand-50/40">P85</th>
               <th class="text-right py-1 px-3 text-[11px] text-slate-400 bg-brand-50/40">P97</th>
               <th class="text-right py-1 px-3 text-[11px] text-emerald-700 font-bold bg-emerald-50/40">孩子</th>
               <th class="text-right py-1 px-3 text-[11px] text-slate-400 bg-emerald-50/40">P3</th>
+              <th class="text-right py-1 px-3 text-[11px] text-slate-500 bg-emerald-50/40">P15</th>
               <th class="text-right py-1 px-3 text-[11px] text-slate-500 font-semibold bg-emerald-50/40">P50</th>
+              <th class="text-right py-1 px-3 text-[11px] text-slate-500 bg-emerald-50/40">P85</th>
               <th class="text-right py-1 px-3 text-[11px] text-slate-400 bg-emerald-50/40">P97</th>
               <th class="py-1 px-3 bg-slate-50/60"></th>
               <th class="py-1 px-3 bg-slate-50/60"></th>
@@ -776,7 +828,9 @@ function tagClass(color) {
                 {{ r.height_cm ?? "-" }}
               </td>
               <td class="py-2 px-3 text-right font-mono text-slate-400">{{ r.heightStd?.p3 ?? "-" }}</td>
+              <td class="py-2 px-3 text-right font-mono text-slate-500">{{ r.heightStd?.p15 ?? "-" }}</td>
               <td class="py-2 px-3 text-right font-mono font-medium text-slate-600">{{ r.heightStd?.p50 ?? "-" }}</td>
+              <td class="py-2 px-3 text-right font-mono text-slate-500">{{ r.heightStd?.p85 ?? "-" }}</td>
               <td class="py-2 px-3 text-right font-mono text-slate-400">{{ r.heightStd?.p97 ?? "-" }}</td>
               <td
                 class="py-2 px-3 text-right font-mono font-bold text-emerald-700"
@@ -785,7 +839,9 @@ function tagClass(color) {
                 {{ r.weight_kg ?? "-" }}
               </td>
               <td class="py-2 px-3 text-right font-mono text-slate-400">{{ r.weightStd?.p3 ?? "-" }}</td>
+              <td class="py-2 px-3 text-right font-mono text-slate-500">{{ r.weightStd?.p15 ?? "-" }}</td>
               <td class="py-2 px-3 text-right font-mono font-medium text-slate-600">{{ r.weightStd?.p50 ?? "-" }}</td>
+              <td class="py-2 px-3 text-right font-mono text-slate-500">{{ r.weightStd?.p85 ?? "-" }}</td>
               <td class="py-2 px-3 text-right font-mono text-slate-400">{{ r.weightStd?.p97 ?? "-" }}</td>
               <td class="py-2 px-3 text-right font-mono text-slate-600">{{ r.bmi ?? "-" }}</td>
               <td class="py-2 px-3">
@@ -833,9 +889,11 @@ function tagClass(color) {
           class="px-4 py-2 border-b border-slate-100 bg-slate-50/50 flex items-center justify-between flex-wrap gap-2"
         >
           <span class="text-xs font-semibold text-slate-600">📏 身高曲线</span>
-          <span class="flex items-center gap-2 text-[11px] text-slate-400">
+          <span class="flex items-center gap-2 text-[11px] text-slate-400 flex-wrap">
             <span class="inline-flex items-center gap-1"><i class="w-3 h-0.5 inline-block bg-red-400"></i>P3</span>
+            <span class="inline-flex items-center gap-1"><i class="w-3 h-0.5 inline-block bg-orange-400"></i>P15</span>
             <span class="inline-flex items-center gap-1"><i class="w-3 h-0.5 inline-block bg-yellow-400"></i>P50</span>
+            <span class="inline-flex items-center gap-1"><i class="w-3 h-0.5 inline-block bg-cyan-500"></i>P85</span>
             <span class="inline-flex items-center gap-1"><i class="w-3 h-0.5 inline-block bg-green-400"></i>P97</span>
             <span class="inline-flex items-center gap-1"
               ><i class="w-2 h-2 inline-block rounded-full bg-indigo-500"></i>孩子</span
@@ -849,9 +907,11 @@ function tagClass(color) {
           class="px-4 py-2 border-b border-slate-100 bg-slate-50/50 flex items-center justify-between flex-wrap gap-2"
         >
           <span class="text-xs font-semibold text-slate-600">⚖️ 体重曲线</span>
-          <span class="flex items-center gap-2 text-[11px] text-slate-400">
+          <span class="flex items-center gap-2 text-[11px] text-slate-400 flex-wrap">
             <span class="inline-flex items-center gap-1"><i class="w-3 h-0.5 inline-block bg-red-400"></i>P3</span>
+            <span class="inline-flex items-center gap-1"><i class="w-3 h-0.5 inline-block bg-orange-400"></i>P15</span>
             <span class="inline-flex items-center gap-1"><i class="w-3 h-0.5 inline-block bg-yellow-400"></i>P50</span>
+            <span class="inline-flex items-center gap-1"><i class="w-3 h-0.5 inline-block bg-cyan-500"></i>P85</span>
             <span class="inline-flex items-center gap-1"><i class="w-3 h-0.5 inline-block bg-green-400"></i>P97</span>
             <span class="inline-flex items-center gap-1"
               ><i class="w-2 h-2 inline-block rounded-full bg-indigo-500"></i>孩子</span
@@ -878,9 +938,11 @@ function tagClass(color) {
               ><i class="w-2 h-2 inline-block rounded-full bg-indigo-500"></i>孩子</span
             >
           </span>
-          <span v-else class="flex items-center gap-2 text-[11px] text-slate-400">
+          <span v-else class="flex items-center gap-2 text-[11px] text-slate-400 flex-wrap">
             <span class="inline-flex items-center gap-1"><i class="w-3 h-0.5 inline-block bg-red-400"></i>P3</span>
+            <span class="inline-flex items-center gap-1"><i class="w-3 h-0.5 inline-block bg-orange-400"></i>P15</span>
             <span class="inline-flex items-center gap-1"><i class="w-3 h-0.5 inline-block bg-yellow-400"></i>P50</span>
+            <span class="inline-flex items-center gap-1"><i class="w-3 h-0.5 inline-block bg-cyan-500"></i>P85</span>
             <span class="inline-flex items-center gap-1"><i class="w-3 h-0.5 inline-block bg-green-400"></i>P97</span>
             <span class="inline-flex items-center gap-1"
               ><i class="w-2 h-2 inline-block rounded-full bg-indigo-500"></i>孩子</span
@@ -940,7 +1002,7 @@ function tagClass(color) {
           <span class="text-brand-600">📐</span>
           <span class="text-sm font-semibold text-slate-800">身高体重标准对照表</span>
           <span class="text-xs text-slate-400 ml-1">
-            {{ (childStore.current?.gender || "male") === "male" ? "男童" : "女童" }} · WS/T 423-2022 + WS/T 611-2018
+            {{ (childStore.current?.gender || "male") === "male" ? "男童" : "女童" }} · WS/T 423-2022 + WS/T 612-2018
           </span>
         </div>
         <span v-if="currentMonthIndex >= 0" class="text-[11px] text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-full">
@@ -952,16 +1014,24 @@ function tagClass(color) {
           <thead>
             <tr class="border-b border-slate-100">
               <th class="text-left py-2 px-3 text-slate-500 font-medium">年龄</th>
-              <th class="text-left py-2 px-3 text-slate-500 font-medium" colspan="3">身高 (cm)</th>
-              <th class="text-left py-2 px-3 text-slate-500 font-medium" colspan="3">体重 (kg)</th>
+              <th class="text-left py-2 px-3 text-slate-500 font-medium" colspan="5">📏 身高 (cm)</th>
+              <th class="text-left py-2 px-3 text-slate-500 font-medium" colspan="5">⚖️ 体重 (kg)</th>
             </tr>
             <tr class="border-b border-slate-100">
               <th class="py-1 px-3"></th>
               <th class="text-left py-1 px-3 text-xs text-slate-400">P3</th>
-              <th class="text-left py-1 px-3 text-xs text-slate-400">P50</th>
+              <th class="text-left py-1 px-3 text-xs text-slate-400">P15</th>
+              <th class="text-left py-1 px-3 text-xs text-slate-500 font-semibold">P50</th>
+              <th class="text-left py-1 px-3 text-xs text-slate-400">P85</th>
               <th class="text-left py-1 px-3 text-xs text-slate-400">P97</th>
               <th class="text-left py-1 px-3 text-xs text-slate-400">P3</th>
-              <th class="text-left py-1 px-3 text-xs text-slate-400">P50</th>
+              <th class="text-left py-1 px-3 text-xs text-slate-400">
+                P15<span v-if="rowHas3OnlyWeight" class="text-slate-300">*</span>
+              </th>
+              <th class="text-left py-1 px-3 text-xs text-slate-500 font-semibold">P50</th>
+              <th class="text-left py-1 px-3 text-xs text-slate-400">
+                P85<span v-if="rowHas3OnlyWeight" class="text-slate-300">*</span>
+              </th>
               <th class="text-left py-1 px-3 text-xs text-slate-400">P97</th>
             </tr>
           </thead>
@@ -976,19 +1046,22 @@ function tagClass(color) {
                 {{ row.label }}
                 <span v-if="currentMonthIndex === i" class="ml-1 text-xs">📍</span>
               </td>
-              <td class="py-2 px-3 font-mono text-slate-600">{{ row.height[0] }}</td>
-              <td class="py-2 px-3 font-mono font-medium text-slate-800">
-                {{ row.height[1] ?? row.height[2] }}
-              </td>
-              <td class="py-2 px-3 font-mono text-slate-600">{{ row.height[2] }}</td>
-              <td class="py-2 px-3 font-mono text-slate-600">{{ row.weight[0] }}</td>
-              <td class="py-2 px-3 font-mono font-medium text-slate-800">
-                {{ row.weight[1] ?? row.weight[2] }}
-              </td>
-              <td class="py-2 px-3 font-mono text-slate-600">{{ row.weight[2] }}</td>
+              <td class="py-2 px-3 font-mono text-slate-600">{{ row.height.p3 }}</td>
+              <td class="py-2 px-3 font-mono text-slate-500">{{ row.height.p15 ?? "—" }}</td>
+              <td class="py-2 px-3 font-mono font-bold text-brand-700">{{ row.height.p50 }}</td>
+              <td class="py-2 px-3 font-mono text-slate-500">{{ row.height.p85 ?? "—" }}</td>
+              <td class="py-2 px-3 font-mono text-slate-600">{{ row.height.p97 }}</td>
+              <td class="py-2 px-3 font-mono text-slate-600">{{ row.weight.p3 }}</td>
+              <td class="py-2 px-3 font-mono text-slate-500">{{ row.weight.p15 ?? "—" }}</td>
+              <td class="py-2 px-3 font-mono font-bold text-emerald-700">{{ row.weight.p50 }}</td>
+              <td class="py-2 px-3 font-mono text-slate-500">{{ row.weight.p85 ?? "—" }}</td>
+              <td class="py-2 px-3 font-mono text-slate-600">{{ row.weight.p97 }}</td>
             </tr>
           </tbody>
         </table>
+      </div>
+      <div class="px-3 pb-2 text-[11px] text-slate-400">
+        <span v-if="hasThreeColWeight" class="text-amber-600">*</span> 该年龄段体重仅 3 档（国内暂无统一国标，参考首都儿科所九市调查 2009）
       </div>
     </div>
 

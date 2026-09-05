@@ -66,9 +66,10 @@ def test_bmi_cutoff_table_consistency():
 # ---- assess_height (0-83 月) ----
 def test_height_male_6m():
     # 6 月男: P3=64.2, P15≈65.85, P50=68.7, P85≈71.45, P97=73.2
+    # 68.7 cm 落在 P50，5 档下应在 P15-P85「中」区间
     r = assess_height(68.7, "male", 6)
-    assert r["category"] == "mid"  # at P50
-    assert r["label"] == "中"
+    assert r["category"] == "mid"
+    assert "中" in r["label"]
 
 
 def test_height_male_6m_above_p97():
@@ -140,14 +141,23 @@ def test_bmi_0_83_3year_old():
 # ---- assess_height 7-18 岁 WS/T 612-2018 (2026-09-05 复核) ----
 def test_height_male_13y_at_median():
     # 13 岁男 中位数 = 160.19 (WS/T 612-2018)
-    # WS/T 612 仅 3 档 [-2SD, 中位数, +2SD]，代码规则 P3≤v≤P50 落「中下」、
-    # P50<v≤P97 落「中上」，故「正中等」以 P50 为分界线。
+    # 2026-09-05 升级：HEIGHT_7_18 改成 5 档 [P3,P15,P50,P85,P97]，
+    # 160.19 正好是 P50 → 落在 P15-P85「中」区间。
     r = assess_height(160.19, "male", 13 * 12)
-    assert r["category"] == "mid_down"
+    assert r["category"] == "mid"
     assert r["source"] == "WS/T 612-2018（SD 法）"
-    # 161 cm 应在 (P50, P97] 区间 → 中上
-    r2 = assess_height(161.0, "male", 13 * 12)
+    # 151 cm = P15 边界，应是中下
+    r1 = assess_height(151.0, "male", 13 * 12)
+    assert r1["category"] == "mid_down"
+    # 169 cm 略大于 P85 (=168.78)，应判为中上
+    r2 = assess_height(169.0, "male", 13 * 12)
     assert r2["category"] == "mid_up"
+    # 143 cm < P3 (143.01) → 下
+    r3 = assess_height(140.0, "male", 13 * 12)
+    assert r3["category"] == "down"
+    # 178 cm > P97 (177.38) → 上
+    r4 = assess_height(180.0, "male", 13 * 12)
+    assert r4["category"] == "up"
 
 
 def test_height_female_3y_corrected():
