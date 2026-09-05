@@ -612,7 +612,8 @@ const openEdit = (r) => {
     bmi: r.bmi ?? "",
     vision_left: r.vision_left ?? "",
     vision_right: r.vision_right ?? "",
-    note: r.note ?? "",
+    // 备注 UI 已隐藏（2026-09-05），编辑时不再回填；提交时仍写空串保兼容。
+    note: "",
   }
   dialogVisible.value = true
 }
@@ -625,6 +626,8 @@ const submit = async () => {
     bmi: form.value.bmi ? Number(form.value.bmi) : null,
     vision_left: form.value.vision_left ? Number(form.value.vision_left) : null,
     vision_right: form.value.vision_right ? Number(form.value.vision_right) : null,
+    // 备注 UI 已隐藏（2026-09-05），提交时强制空串，不影响后端 schema。
+    note: "",
   }
   try {
     if (editing.value) {
@@ -821,14 +824,13 @@ function tagClass(color) {
             <tr>
               <th class="text-left py-2 px-3 text-slate-500 font-medium bg-slate-50/60">日期</th>
               <th class="text-left py-2 px-3 text-slate-500 font-medium bg-slate-50/60">年龄</th>
-              <th class="text-right py-2 px-3 text-brand-700 font-semibold bg-brand-50/40" colspan="6">📏 身高 (cm)</th>
-              <th class="text-right py-2 px-3 text-emerald-700 font-semibold bg-emerald-50/40" colspan="6">
+              <th class="text-right py-2 px-3 text-brand-700 font-semibold bg-brand-50/40" colspan="4">📏 身高 (cm)</th>
+              <th class="text-right py-2 px-3 text-emerald-700 font-semibold bg-emerald-50/40" colspan="4">
                 ⚖️ 体重 (kg)
               </th>
               <th class="text-right py-2 px-3 text-slate-500 font-medium bg-slate-50/60">BMI</th>
               <th class="text-left py-2 px-3 text-slate-500 font-medium bg-slate-50/60">等级</th>
               <th class="text-left py-2 px-3 text-slate-500 font-medium bg-slate-50/60">视力</th>
-              <th class="text-left py-2 px-3 text-slate-500 font-medium bg-slate-50/60">备注</th>
               <th class="text-right py-2 px-3 text-slate-500 font-medium bg-slate-50/60">操作</th>
             </tr>
             <tr class="border-b border-slate-100">
@@ -836,17 +838,12 @@ function tagClass(color) {
               <th class="py-1 px-3 bg-slate-50/60"></th>
               <th class="text-right py-1 px-3 text-[11px] text-brand-700 font-bold bg-brand-50/40">孩子</th>
               <th class="text-right py-1 px-3 text-[11px] text-slate-400 bg-brand-50/40">P3</th>
-              <th class="text-right py-1 px-3 text-[11px] text-slate-500 bg-brand-50/40">P15</th>
               <th class="text-right py-1 px-3 text-[11px] text-slate-500 font-semibold bg-brand-50/40">P50</th>
-              <th class="text-right py-1 px-3 text-[11px] text-slate-500 bg-brand-50/40">P85</th>
               <th class="text-right py-1 px-3 text-[11px] text-slate-400 bg-brand-50/40">P97</th>
               <th class="text-right py-1 px-3 text-[11px] text-emerald-700 font-bold bg-emerald-50/40">孩子</th>
               <th class="text-right py-1 px-3 text-[11px] text-slate-400 bg-emerald-50/40">P3</th>
-              <th class="text-right py-1 px-3 text-[11px] text-slate-500 bg-emerald-50/40">P15</th>
               <th class="text-right py-1 px-3 text-[11px] text-slate-500 font-semibold bg-emerald-50/40">P50</th>
-              <th class="text-right py-1 px-3 text-[11px] text-slate-500 bg-emerald-50/40">P85</th>
               <th class="text-right py-1 px-3 text-[11px] text-slate-400 bg-emerald-50/40">P97</th>
-              <th class="py-1 px-3 bg-slate-50/60"></th>
               <th class="py-1 px-3 bg-slate-50/60"></th>
               <th class="py-1 px-3 bg-slate-50/60"></th>
               <th class="py-1 px-3 bg-slate-50/60"></th>
@@ -864,9 +861,7 @@ function tagClass(color) {
                 {{ r.height_cm ?? "-" }}
               </td>
               <td class="py-2 px-3 text-right font-mono text-slate-400">{{ r.heightStd?.p3 ?? "-" }}</td>
-              <td class="py-2 px-3 text-right font-mono text-slate-500">{{ r.heightStd?.p15 ?? "-" }}</td>
               <td class="py-2 px-3 text-right font-mono font-medium text-slate-600">{{ r.heightStd?.p50 ?? "-" }}</td>
-              <td class="py-2 px-3 text-right font-mono text-slate-500">{{ r.heightStd?.p85 ?? "-" }}</td>
               <td class="py-2 px-3 text-right font-mono text-slate-400">{{ r.heightStd?.p97 ?? "-" }}</td>
               <td
                 class="py-2 px-3 text-right font-mono font-bold text-emerald-700"
@@ -875,9 +870,7 @@ function tagClass(color) {
                 {{ r.weight_kg ?? "-" }}
               </td>
               <td class="py-2 px-3 text-right font-mono text-slate-400">{{ r.weightStd?.p3 ?? "-" }}</td>
-              <td class="py-2 px-3 text-right font-mono text-slate-500">{{ r.weightStd?.p15 ?? "-" }}</td>
               <td class="py-2 px-3 text-right font-mono font-medium text-slate-600">{{ r.weightStd?.p50 ?? "-" }}</td>
-              <td class="py-2 px-3 text-right font-mono text-slate-500">{{ r.weightStd?.p85 ?? "-" }}</td>
               <td class="py-2 px-3 text-right font-mono text-slate-400">{{ r.weightStd?.p97 ?? "-" }}</td>
               <td class="py-2 px-3 text-right font-mono text-slate-600">{{ r.bmi ?? "-" }}</td>
               <td class="py-2 px-3">
@@ -907,7 +900,6 @@ function tagClass(color) {
               <td class="py-2 px-3 text-slate-500 whitespace-nowrap font-mono">
                 {{ r.vision_left ?? "-" }}<span class="text-slate-300">/</span>{{ r.vision_right ?? "-" }}
               </td>
-              <td class="py-2 px-3 text-slate-400 max-w-[160px] truncate">{{ r.note || "-" }}</td>
               <td class="py-2 px-3 text-right whitespace-nowrap">
                 <button class="text-xs text-brand-600 hover:text-brand-700 mr-2" @click="openEdit(r)">编辑</button>
                 <button class="text-xs text-rose-600 hover:text-rose-700" @click="remove(r)">删除</button>
@@ -1134,9 +1126,9 @@ function tagClass(color) {
           <el-form-item label="右眼视力">
             <el-input v-model="form.vision_right" type="number" step="0.1" />
           </el-form-item>
-          <el-form-item label="备注" class="col-span-2">
-            <el-input v-model="form.note" type="textarea" :rows="2" />
-          </el-form-item>
+          <!-- 备注字段已隐藏（华哥 2026-09-05 反馈）：
+               后端 note 字段保留，编辑时仍写入空字符串以保持兼容。
+               历史 note 数据不动，仅 UI 屏蔽录入和展示。 -->
         </div>
       </el-form>
       <template #footer>
