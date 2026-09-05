@@ -163,6 +163,14 @@ const closeReport = () => {
   activeReport.value = null
 }
 
+// 复制详情原文到剪贴板
+// 2026-09-05：原模板用 @click="\n  ...\n  ..." 多语句反模式，编译器不接受，
+// 改成调用 script setup 里定义的函数（与 MEMORY 中"AIReports.vue:450 反模式"对应）。
+const copyReport = async () => {
+  await navigator.clipboard.writeText(activeReport.value?.raw_markdown || "")
+  ElMessage.success("已复制原文")
+}
+
 // ============== 删除 ==============
 const deleteReport = async (id, title) => {
   try {
@@ -447,10 +455,7 @@ const childName = computed(() => childStore.current?.name || "孩子")
         <div class="border-t border-slate-100 pt-3 flex justify-end gap-2">
           <button
             class="btn-ghost text-sm"
-            @click="
-              navigator.clipboard.writeText(activeReport.raw_markdown)
-              ElMessage.success('已复制原文')
-            "
+            @click="copyReport"
           >
             📋 复制原文
           </button>
