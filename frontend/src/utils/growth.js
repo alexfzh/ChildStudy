@@ -29,6 +29,10 @@ export function computeBMI(heightCm, weightKg) {
 /**
  * BMI category based on WS/T 586-2018 (6-18岁) or WS/T 423-2022 (<7岁).
  * Returns { category, label, color, source }
+ *
+ * 2026-09-05 复核后口径调整：0-83 月 P85-P97 与 ≥P97 均标为「超重」/
+ * 「肥胖」，与后端 assess_bmi 保持一致（之前前端用了「偏胖」一词，
+ * 与后端「超重」不一致）。
  */
 export function assessBMI(bmi, gender, ageMonths) {
   if (bmi == null || ageMonths == null) {
@@ -45,7 +49,7 @@ export function assessBMI(bmi, gender, ageMonths) {
     if (bmi <= p50) return { category: "normal", label: "正常", color: "success", source: "WS/T 423-2022（百分位法）" }
     if (bmi <= p85) return { category: "normal", label: "正常", color: "success", source: "WS/T 423-2022（百分位法）" }
     if (bmi < p97)
-      return { category: "overweight", label: "偏胖", color: "warning", source: "WS/T 423-2022（百分位法）" }
+      return { category: "overweight", label: "超重", color: "warning", source: "WS/T 423-2022（百分位法）" }
     return { category: "obese", label: "肥胖", color: "danger", source: "WS/T 423-2022（百分位法）" }
   }
   if (ageMonths > 216) {

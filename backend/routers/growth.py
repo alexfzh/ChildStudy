@@ -33,18 +33,22 @@ router = APIRouter(prefix="/api/growth", tags=["生长发育"])
 def get_standards():
     """Return Chinese growth standards for frontend charts.
 
-    Sources:
-      - WS/T 423-2022 (0-7 岁 身高/体重/BMI 百分位)
-      - WS/T 586-2018 (6-18 岁 BMI 切点)
-      - WS/T 611-2018 (7-18 岁身高)
+    Sources (audited 2026-09-05):
+      - WS/T 423-2022 (0-7 岁 身高 / 体重 / BMI 百分位) — 国家标准
+      - WS/T 612-2018 (7-18 岁身高发育等级评价) — 国家标准, SD 法
+      - WS/T 586-2018 (6-18 岁 BMI 超重 / 肥胖切点) — 国家标准
+      - 7-18 岁体重 P3/P50/P97: 国内暂无对应国标 (WS/T 612 仅覆盖身高,
+        WS/T 586 仅覆盖 BMI 切点). 沿用首都儿科研究所九城市儿童体格发育
+        调查 (2009 报告), 仅作参考, 应结合 BMI 切点与医生评估综合判断。
     Note: WHO data is not yet implemented (future enhancement).
     """
     return {
-        "schema_version": 1,
+        "schema_version": 2,  # 2026-09-05: 标注 WS/T 612 + 7-18 岁体重非国标
         "sources": [
-            "WS/T 423-2022 (0-7 岁)",
-            "WS/T 586-2018 (6-18 岁 BMI 切点)",
-            "WS/T 611-2018 (7-18 岁身高)",
+            "WS/T 423-2022 (0-7 岁 身高/体重/BMI 百分位) — 国家标准",
+            "WS/T 612-2018 (7-18 岁 身高发育等级评价, SD 法) — 国家标准",
+            "WS/T 586-2018 (6-18 岁 BMI 超重/肥胖切点) — 国家标准",
+            "7-18 岁 体重 P3/P50/P97 — 九城市儿童体格发育调查 (2009), 非国标, 参考",
         ],
         "height_0_83_months": HEIGHT_0_83,  # type: ignore[return-value]
         "weight_0_83_months": WEIGHT_0_83,  # type: ignore[return-value]

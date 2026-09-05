@@ -134,7 +134,8 @@ def assess_height(height_cm: float | None, gender: Gender, age_months: int | Non
     elif age_months <= 216:
         yr = age_months / 12
         cat, pct = _lookup_7_18(gender, yr, h, HEIGHT_7_18)
-        src = "WS/T 611-2018"
+        # 7-18 岁身高标准编号是 WS/T 612-2018（不是 611），标准采用 SD 法
+        src = "WS/T 612-2018（SD 法）"
     else:
         return {"category": "unknown", "label": "-", "percentile": None, "source": "-"}
     labels = {
@@ -155,11 +156,15 @@ def assess_weight(weight_kg: float | None, gender: Gender, age_months: int | Non
         return {"category": "unknown", "label": "-", "percentile": None, "source": "-"}
     if age_months <= 83:
         cat, pct = _lookup_0_83(gender, age_months, w, WEIGHT_0_83)
+        # 0-83 月有 WS/T 423-2022 国标
         src = "WS/T 423-2022"
     elif age_months <= 216:
         yr = age_months / 12
         cat, pct = _lookup_7_18(gender, yr, w, WEIGHT_7_18)
-        src = "WS/T 611-2018 / 2009 标准"
+        # 7-18 岁体重国内无统一国标（WS/T 612-2018 仅覆盖身高），
+        # 当前数据沿用首都儿科研究所九城市儿童体格发育调查 (2009)，
+        # 仅作参考，应结合 BMI 切点（WS/T 586-2018）与医生评估综合判断。
+        src = "九城市儿童体格发育调查 2009（非国标，参考）"
     else:
         return {"category": "unknown", "label": "-", "percentile": None, "source": "-"}
     labels = {
@@ -224,19 +229,49 @@ def assess_bmi(bmi: float | None, gender: Gender, age_months: int | None) -> dic
 
 
 def get_standard_description() -> dict:
-    """Return human-readable description of BMI standards."""
+    """Return human-readable description of growth standards (audited 2026-09-05).
+
+    重要说明：
+    - 0-7 岁（0-83 月）身高 / 体重 / BMI：WS/T 423-2022《7 岁以下儿童生长标准》
+      国家卫健委 2022-09-19 发布，2023-03-01 实施。
+    - 7-18 岁身高：WS/T 612-2018《7 岁～18 岁儿童青少年身高发育等级评价》
+      国家卫健委 2018-06-15 发布，2018-12-01 实施；采用 SD 法（-2SD/中位数/+2SD），
+      近似展示为 [P3, P50, P97]。
+    - 6-18 岁 BMI 超重 / 肥胖切点：WS/T 586-2018《学龄儿童青少年超重与肥胖筛查》，
+      每半岁一档 [超重界, 肥胖界]。
+    - 7-18 岁体重（P3/P50/P97）：国内暂无统一国标。
+      WS/T 612-2018 不覆盖体重，WS/T 586-2018 不给身高体重 P3/P50/P97。
+      当前沿用首都儿科研究所九城市儿童体格发育调查（2009 报告），
+      仅作参考，应结合 BMI 切点与医生评估综合判断。
+    """
     return {
         "cn_0_7": {
             "title": "0-7 岁（WS/T 423-2022）",
-            "desc": "采用百分位数法。P3-P97 为正常范围，<P3 为偏瘦，>P97 为偏胖。",
+            "desc": (
+                "采用百分位数法。P3-P97 为正常范围，<P3 为偏瘦，"
+                ">P97 为偏胖。0-83 月身高/体重/BMI 全部为国家标准。"
+            ),
         },
         "cn_6_18": {
             "title": "6-18 岁（WS/T 586-2018）",
-            "desc": "采用性别年龄别 BMI 切点。超重 = BMI ≥ 超重界值且 < 肥胖界值；肥胖 = BMI ≥ 肥胖界值。",
+            "desc": (
+                "采用性别年龄别 BMI 切点。超重 = BMI ≥ 超重界值且 < 肥胖界值；"
+                "肥胖 = BMI ≥ 肥胖界值。"
+            ),
             "cutoffs": BMI_CUTOFFS_6_18,
         },
         "cn_height_7_18": {
-            "title": "7-18 岁身高（WS/T 611-2018）",
-            "desc": "采用 P3/P50/P97 三档评价。<P3 为下，P3-P50 为下中，P50-P97 为中上，≥P97 为上。",
+            "title": "7-18 岁身高（WS/T 612-2018）",
+            "desc": (
+                "采用 SD 法（-2SD / 中位数 / +2SD），系统近似展示为 [P3, P50, P97]。"
+                "<P3 为下，P3-P50 为下中，P50-P97 为中上，≥P97 为上。"
+            ),
+        },
+        "cn_weight_7_18": {
+            "title": "7-18 岁体重（参考值）",
+            "desc": (
+                "⚠️ 国内暂无统一国家标准。当前沿用首都儿科研究所九城市儿童体格发育调查"
+                "（2009 报告），仅作参考；建议结合 BMI 切点（WS/T 586-2018）与医生评估综合判断。"
+            ),
         },
     }
