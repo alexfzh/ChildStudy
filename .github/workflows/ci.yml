@@ -18,7 +18,7 @@ jobs:
         working-directory: backend
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v7
         with:
           python-version: "3.13"
       # 注意:ruff/pytest 在 requirements-dev.txt,漏装会导致 lint/test 步骤必挂
@@ -59,7 +59,7 @@ jobs:
           cache: npm
           cache-dependency-path: frontend/package-lock.json
       # audit:routes 是 python 脚本,需要 python
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v7
         with:
           python-version: "3.13"
       - name: Install deps
