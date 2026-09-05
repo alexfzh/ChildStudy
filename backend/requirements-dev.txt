@@ -4,4 +4,4 @@ pytest==9.1.1
 pytest-asyncio==1.4.0
 httpx==0.28.1
 ruff==0.16.5  # 静态检查：未用导入 / 裸 except / 不可达代码等（CQ-9 防回流）
-pip-audit==2.9.0  # 依赖漏洞扫描（CI 跑 .github/workflows/ci.yml 的 pip-audit 步骤）
+pip-audit==2.10.1  # 依赖漏洞扫描（CI 跑 .github/workflows/ci.yml 的 pip-audit 步骤）
