@@ -291,19 +291,49 @@ function buildChartOption(seriesData, bands, title, unit, axisMin, axisMax) {
     title: title ? { text: title, left: "left", textStyle: { fontSize: 13, fontWeight: 600 } } : undefined,
     tooltip: {
       trigger: "axis",
+      // 2026-09-05: snap 强制鼠标 x 对齐到最近数据点；体重/身高常见 1~3 个稀疏记录，
+      // 不 snap 时 axisPointer 找不到最近点 → tooltip 不出。
+      // triggerOn 显式开启 mousemove + click（默认 mousemove|click，但过往版本偶发失效）。
+      axisPointer: {
+        type: "cross",
+        snap: true,
+        label: { backgroundColor: "#475569" },
+      },
+      triggerOn: "mousemove|click",
+      backgroundColor: "rgba(255,255,255,0.98)",
+      borderColor: "#e2e8f0",
+      textStyle: { color: "#0f172a", fontSize: 12 },
       formatter: (params) => {
         if (!params || !params.length) return ""
         const p = params[0]
-        const ageLabel = p.axisValue
-        let html = `<div style="font-weight:600;margin-bottom:4px">${ageLabel} 月龄</div>`
-        params.forEach((item) => {
-          if (item.seriesName === "bands") return
+        const months = p.axisValue
+        const yr = Math.floor(months / 12)
+        const mo = Math.round(months % 12)
+        const ageLabel = yr > 0 ? `${yr} 岁 ${mo} 月` : `${mo} 月`
+        let html = `<div style="font-weight:600;margin-bottom:6px;color:#0f172a">📅 ${ageLabel} (${Math.round(months)} 月龄)</div>`
+        // 孩子系列优先显示；参考带后置且用浅色
+        const child = params.find((it) => it.seriesName === "孩子" && it.value && it.value[1] != null)
+        const refs = params.filter((it) => it.seriesName !== "孩子" && it.value && it.value[1] != null)
+        if (child) {
           html +=
-            `<div style="display:flex;align-items:center;gap:6px;font-size:12px;margin:2px 0">` +
-            `<span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${item.color}"></span>` +
-            `<span>${item.seriesName}: <strong>${item.value[1].toFixed(1)}${unit}</strong></span>` +
+            `<div style="display:flex;align-items:center;gap:6px;font-size:12px;margin:3px 0;padding:4px 6px;background:#eef2ff;border-radius:4px">` +
+            `<span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:${child.color}"></span>` +
+            `<span style="font-weight:600">孩子: <strong style="color:#4338ca">${child.value[1].toFixed(1)} ${unit}</strong></span>` +
             `</div>`
-        })
+        }
+        if (refs.length) {
+          html += `<div style="border-top:1px dashed #cbd5e1;margin:4px 0;padding-top:4px;color:#64748b;font-size:11px">参考带</div>`
+          refs.forEach((item) => {
+            html +=
+              `<div style="display:flex;align-items:center;gap:6px;font-size:11px;margin:1px 0;color:#475569">` +
+              `<span style="display:inline-block;width:8px;height:2px;background:${item.color}"></span>` +
+              `<span>${item.seriesName}: <strong>${item.value[1].toFixed(1)} ${unit}</strong></span>` +
+              `</div>`
+          })
+        }
+        if (!child && !refs.length) {
+          return `<div style="color:#64748b">${ageLabel} 无数据</div>`
+        }
         return html
       },
     },
@@ -343,9 +373,15 @@ function buildChartOption(seriesData, bands, title, unit, axisMin, axisMax) {
         type: "line",
         data: seriesData,
         symbol: "circle",
-        symbolSize: 7,
+        // 2026-09-05: 加大命中区 + emphasis hover 放大，体重/身高稀疏记录时鼠标容易命中
+        symbolSize: 10,
         lineStyle: { width: 2.5, color: "#6366f1" },
         itemStyle: { color: "#6366f1" },
+        emphasis: {
+          focus: "series",
+          scale: 1.4,
+          itemStyle: { color: "#4338ca", borderColor: "#fff", borderWidth: 2 },
+        },
         z: 2,
       },
     ],
